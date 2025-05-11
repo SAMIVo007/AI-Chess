@@ -1,80 +1,114 @@
-import { Image, StyleSheet, Platform } from "react-native";
-
-import { HelloWave } from "@/components/HelloWave";
+import React from "react";
+import {
+	View,
+	Text,
+	TouchableOpacity,
+	StyleSheet,
+	Dimensions,
+} from "react-native";
+import { Feather, FontAwesome } from "@expo/vector-icons";
 import ParallaxScrollView from "@/components/ParallaxScrollView";
-import { ThemedText } from "@/components/ThemedText";
-import { ThemedView } from "@/components/ThemedView";
-import Board from "@/components/chess/Board";
+import { useFonts } from "expo-font";
+import { useRouter } from "expo-router";
+
+const { width } = Dimensions.get("window");
+
+const BUTTON_WIDTH = (width - 60) / 2; // Two columns with adjusted gap
+
+const HEADER_HEIGHT = 250;
 
 export default function HomeScreen() {
+	const router = useRouter();
+
+	const [fontsLoaded] = useFonts({
+		"Montserrat-Bold": require("@/assets/fonts/Montserrat-Bold.ttf"),
+
+		"Montserrat-Regular": require("@/assets/fonts/Montserrat-Regular.ttf"),
+	});
+
+	if (!fontsLoaded) {
+		return null; // or a loading indicator
+	}
+
+	const headerImage = (
+		<View className="flex-1 bg-gray-900">
+			<View className="flex-row flex-wrap justify-center p-4 pt-12">
+				{[
+					{ icon: "play", label: "Play", route: "/game" },
+
+					{ icon: "code", label: "Practice", route: "/practice" },
+
+					{ icon: "users", label: "Friends", route: "/friends" },
+
+					{ icon: "target", label: "Tactics", route: "/tactics" },
+				].map(({ icon, label, route }) => (
+					<TouchableOpacity
+						key={label}
+						onPress={() => route && router.push(route as any)}
+						className="bg-white/20 rounded-2xl shadow-lg p-4 mb-5 mx-2"
+						style={{ width: BUTTON_WIDTH, height: BUTTON_WIDTH }}
+					>
+						<View className="flex-1 justify-center items-center">
+							<Feather name={icon as any} size={40} color="white" />
+							<Text
+								style={{ fontFamily: "Montserrat-Regular" }}
+								className="mt-2 text-lg font-medium text-white"
+							>
+								{label}
+							</Text>
+						</View>
+					</TouchableOpacity>
+				))}
+			</View>
+		</View>
+	);
+
 	return (
 		<ParallaxScrollView
-			headerBackgroundColor={{ light: "#A1CEDC", dark: "#1D3D47" }}
-			headerImage={
-				<Image
-					source={require("@/assets/images/partial-react-logo.png")}
-					style={styles.reactLogo}
-				/>
-			}
+			headerImage={headerImage}
+			headerBackgroundColor={{ dark: "#1f1f1f", light: "#ffffff" }}
 		>
-			<Board />
+			{/* Game History Section */}
+			<View className="px-4 mt-4">
+				<Text
+					style={{ fontFamily: "Montserrat-Bold" }}
+					className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3"
+				>
+					Game History
+				</Text>
 
-			<ThemedView style={styles.titleContainer}>
-				<ThemedText type="title">Welcome!</ThemedText>
-				<HelloWave />
-			</ThemedView>
-			<ThemedView style={styles.stepContainer}>
-				<ThemedText type="subtitle">Step 1: Try it</ThemedText>
-				<ThemedText>
-					Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText>{" "}
-					to see changes. Press{" "}
-					<ThemedText type="defaultSemiBold">
-						{Platform.select({
-							ios: "cmd + d",
-							android: "cmd + m",
-							web: "F12",
-						})}
-					</ThemedText>{" "}
-					to open developer tools.
-				</ThemedText>
-			</ThemedView>
-			<ThemedView style={styles.stepContainer}>
-				<ThemedText type="subtitle">Step 2: Explore</ThemedText>
-				<ThemedText>
-					Tap the Explore tab to learn more about what's included in this starter
-					app.
-				</ThemedText>
-			</ThemedView>
-			<ThemedView style={styles.stepContainer}>
-				<ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-				<ThemedText>
-					When you're ready, run{" "}
-					<ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to
-					get a fresh <ThemedText type="defaultSemiBold">app</ThemedText> directory.
-					This will move the current{" "}
-					<ThemedText type="defaultSemiBold">app</ThemedText> to{" "}
-					<ThemedText type="defaultSemiBold">app-example</ThemedText>.
-				</ThemedText>
-			</ThemedView>
+				{/* Example Game History Item */}
+				<View className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4">
+					<Text className="text-gray-800 dark:text-gray-200">
+						Recent Game vs. OpponentName
+					</Text>
+					<Text className="text-sm text-gray-600 dark:text-gray-400">
+						Result: Win
+					</Text>
+				</View>
+
+				{/* Add more game history items here */}
+			</View>
+
+			{/* Social Section */}
+			<View className="px-4 mt-4">
+				<Text
+					style={{ fontFamily: "Montserrat-Bold" }}
+					className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3"
+				>
+					Friends
+				</Text>
+
+				{/* Example Friend Item */}
+				<View className="flex-row items-center bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4">
+					<FontAwesome name="user-circle" size={30} color="#718096" />
+					<Text className="ml-3 text-base text-gray-700 dark:text-gray-300">
+						Friend Name
+					</Text>
+				</View>
+
+				{/* Add more friend items here */}
+			</View>
 		</ParallaxScrollView>
 	);
 }
-
-const styles = StyleSheet.create({
-	titleContainer: {
-		flexDirection: "row",
-		alignItems: "center",
-		gap: 8,
-	},
-	stepContainer: {
-		gap: 8,
-		marginBottom: 8,
-	},
-	reactLogo: {
-		height: 178,
-		width: 290,
-		bottom: 0,
-		left: 0,
-		position: "absolute",
-	},
-});
