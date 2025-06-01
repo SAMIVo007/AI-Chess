@@ -1,58 +1,77 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
 	View,
 	Text,
 	TouchableOpacity,
-	StyleSheet,
+	FlatList,
+	Image,
 	Dimensions,
+	ScrollView,
 } from "react-native";
 import { Feather, FontAwesome } from "@expo/vector-icons";
-import ParallaxScrollView from "@/components/ParallaxScrollView";
-import { useFonts } from "expo-font";
 import { useRouter } from "expo-router";
+import { useFonts } from "expo-font";
+import { ThemedText } from "@/components/ThemedText";
+import ParallaxScrollView from "@/components/ParallaxScrollView";
 
 const { width } = Dimensions.get("window");
-
-const BUTTON_WIDTH = (width - 60) / 2; // Two columns with adjusted gap
-
-const HEADER_HEIGHT = 250;
+const BUTTON_WIDTH = (width - 60) / 2;
 
 export default function HomeScreen() {
 	const router = useRouter();
+	const [dayDate, setDayDate] = useState("");
 
-	const [fontsLoaded] = useFonts({
-		"Montserrat-Bold": require("@/assets/fonts/Montserrat-Bold.ttf"),
-
-		"Montserrat-Regular": require("@/assets/fonts/Montserrat-Regular.ttf"),
-	});
-
-	if (!fontsLoaded) {
-		return null; // or a loading indicator
-	}
+	useEffect(() => {
+		const today = new Date();
+		const date = today.toLocaleString("default", { day: "2-digit" });
+		const day = today
+			.toLocaleDateString("default", { weekday: "long" })
+			.toUpperCase();
+		const month = today
+			.toLocaleDateString("default", { month: "short" })
+			.toUpperCase();
+		setDayDate(`${day}, ${month} ${date}`);
+	}, []);
 
 	const headerImage = (
-		<View className="flex-1 bg-gray-900">
-			<View className="flex-row flex-wrap justify-center p-4 pt-12">
+		<View className="flex-1">
+			<View className="m-8 mt-4 mb-6 flex-row justify-between items-start">
+				<View>
+					<ThemedText
+						type="link"
+						className="pb-2"
+						style={{ fontSize: 14, color: "#888888" }}
+					>
+						{dayDate}
+					</ThemedText>
+
+					<ThemedText type="title" style={{ lineHeight: 28 }}>
+						Welcome Back
+					</ThemedText>
+				</View>
+			</View>
+
+			<View className="flex-row flex-wrap justify-center p-4">
 				{[
-					{ icon: "play", label: "Play", route: "/game" },
-
-					{ icon: "code", label: "Practice", route: "/practice" },
-
-					{ icon: "users", label: "Friends", route: "/friends" },
-
-					{ icon: "target", label: "Tactics", route: "/tactics" },
+					{ icon: "cpu", label: "Play vs AI", route: "/play-options" },
+					{ icon: "globe", label: "Play Online", route: null },
+					{ icon: "users", label: "Pass & Play", route: null },
+					{ icon: "bar-chart-2", label: "Stats", route: null },
 				].map(({ icon, label, route }) => (
 					<TouchableOpacity
 						key={label}
-						onPress={() => route && router.push(route as any)}
-						className="bg-white/20 rounded-2xl shadow-lg p-4 mb-5 mx-2"
+						disabled={!route}
+						onPress={() => route && router.push(route)}
+						className={`rounded-2xl shadow-lg p-4 mb-5 mx-2 ${
+							route ? "bg-white/20" : "bg-gray-600/10 opacity-50"
+						}`}
 						style={{ width: BUTTON_WIDTH, height: BUTTON_WIDTH }}
 					>
 						<View className="flex-1 justify-center items-center">
 							<Feather name={icon as any} size={40} color="white" />
 							<Text
 								style={{ fontFamily: "Montserrat-Regular" }}
-								className="mt-2 text-lg font-medium text-white"
+								className="mt-2 text-lg font-medium text-white text-center"
 							>
 								{label}
 							</Text>
@@ -66,48 +85,44 @@ export default function HomeScreen() {
 	return (
 		<ParallaxScrollView
 			headerImage={headerImage}
-			headerBackgroundColor={{ dark: "#1f1f1f", light: "#ffffff" }}
 		>
-			{/* Game History Section */}
-			<View className="px-4 mt-4">
+			{/* Recent Games */}
+			<View className="px-4 mt-6">
 				<Text
 					style={{ fontFamily: "Montserrat-Bold" }}
-					className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3"
+					className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3"
 				>
-					Game History
+					Recent Games
 				</Text>
-
-				{/* Example Game History Item */}
 				<View className="bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4">
 					<Text className="text-gray-800 dark:text-gray-200">
-						Recent Game vs. OpponentName
+						Win vs Stockfish Level 3
 					</Text>
 					<Text className="text-sm text-gray-600 dark:text-gray-400">
-						Result: Win
+						Played today
 					</Text>
 				</View>
-
-				{/* Add more game history items here */}
 			</View>
 
-			{/* Social Section */}
-			<View className="px-4 mt-4">
+			{/* Friends Section */}
+			<View className="px-4 mt-1 mb-8">
 				<Text
 					style={{ fontFamily: "Montserrat-Bold" }}
-					className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3"
+					className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-3"
 				>
 					Friends
 				</Text>
-
-				{/* Example Friend Item */}
-				<View className="flex-row items-center bg-white dark:bg-gray-800 rounded-xl shadow p-4 mb-4">
-					<FontAwesome name="user-circle" size={30} color="#718096" />
-					<Text className="ml-3 text-base text-gray-700 dark:text-gray-300">
-						Friend Name
-					</Text>
-				</View>
-
-				{/* Add more friend items here */}
+				<ScrollView horizontal showsHorizontalScrollIndicator={false}>
+					{["Alice", "Bob", "Charlie"].map((friend, index) => (
+						<View
+							key={index}
+							className="flex-col items-center mr-4 bg-white/10 rounded-lg p-8"
+						>
+							<FontAwesome name="user-circle" size={40} color="#ccc" />
+							<Text className="mt-2 text-white">{friend}</Text>
+						</View>
+					))}
+				</ScrollView>
 			</View>
 		</ParallaxScrollView>
 	);

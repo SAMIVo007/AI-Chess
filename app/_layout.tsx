@@ -10,6 +10,21 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import "react-native-reanimated";
 import "../global.css";
+import {
+	configureReanimatedLogger,
+	ReanimatedLogLevel,
+} from "react-native-reanimated";
+import {
+	SafeAreaView,
+	SafeAreaProvider,
+	SafeAreaInsetsContext,
+	useSafeAreaInsets,
+} from "react-native-safe-area-context";
+
+configureReanimatedLogger({
+	level: ReanimatedLogLevel.warn,
+	strict: false, // Reanimated runs in strict mode by default
+});
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -36,16 +51,27 @@ export default function RootLayout() {
 	return (
 		<GestureHandlerRootView>
 			<ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-				<Stack>
-					<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-					<Stack.Screen
-						name="game"
-						options={{
-							headerShown: false,
-						}}
-					/>
-					<Stack.Screen name="+not-found" />
-				</Stack>
+				<SafeAreaProvider>
+					<SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+						<Stack>
+							<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+							<Stack.Screen
+								name="game"
+								options={{
+									headerShown: false,
+								}}
+							/>
+							<Stack.Screen
+								name="play-options"
+								options={{
+									title: "Play Options",
+									headerTitleAlign: "center",
+								}}
+							/>
+							<Stack.Screen name="+not-found" />
+						</Stack>
+					</SafeAreaView>
+				</SafeAreaProvider>
 				<StatusBar style="auto" />
 			</ThemeProvider>
 		</GestureHandlerRootView>
