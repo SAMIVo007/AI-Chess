@@ -14,12 +14,6 @@ import {
 	configureReanimatedLogger,
 	ReanimatedLogLevel,
 } from "react-native-reanimated";
-import {
-	SafeAreaView,
-	SafeAreaProvider,
-	SafeAreaInsetsContext,
-	useSafeAreaInsets,
-} from "react-native-safe-area-context";
 
 configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
@@ -51,27 +45,24 @@ export default function RootLayout() {
 	return (
 		<GestureHandlerRootView>
 			<ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-				<SafeAreaProvider>
-					<SafeAreaView edges={["top"]} style={{ flex: 1 }}>
-						<Stack>
-							<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-							<Stack.Screen
-								name="game"
-								options={{
-									headerShown: false,
-								}}
-							/>
-							<Stack.Screen
-								name="play-options"
-								options={{
-									title: "Play Options",
-									headerTitleAlign: "center",
-								}}
-							/>
-							<Stack.Screen name="+not-found" />
-						</Stack>
-					</SafeAreaView>
-				</SafeAreaProvider>
+				<Stack>
+					<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+					<Stack.Screen
+						name="game"
+						options={{
+							headerShown: false,
+						}}
+					/>
+					<Stack.Screen
+						name="play-options"
+						options={{
+							title: "Play Options",
+							headerTitleAlign: "center",
+						}}
+					/>
+					<Stack.Screen name="+not-found" />
+				</Stack>
+
 				<StatusBar style="auto" />
 			</ThemeProvider>
 		</GestureHandlerRootView>

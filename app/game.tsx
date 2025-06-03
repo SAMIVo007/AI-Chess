@@ -8,7 +8,7 @@ import {
 	Image,
 	Dimensions,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
 import { ThemedView } from "@/components/ThemedView";
 import Chessboard, { ChessboardRef } from "react-native-chessboard";
@@ -93,6 +93,10 @@ const getDescriptiveMove = (
 
 export default function GameScreen() {
 	const router = useRouter();
+	const params = useLocalSearchParams<{
+		levelSelected: string;
+		timeSelected: string;
+	}>();
 
 	const [game] = useState(() => new Chess());
 	const [fen, setFen] = useState(game.fen());
@@ -115,15 +119,31 @@ export default function GameScreen() {
 	// Voice toggle (optional)
 	const [voiceOn, setVoiceOn] = useState(true);
 
-	// Example clocks
+	// clocks
 	const [whiteTime, setWhiteTime] = useState(300);
 	const [blackTime, setBlackTime] = useState(300);
 
 	const chessRef = useRef<ChessboardRef>(null);
 	const listRef = useRef<FlatList<string>>(null);
 
+	useEffect(() => {
+		const { levelSelected, timeSelected } = params;
+
+		if (levelSelected) {
+			console.log("AI Difficulty Level:", levelSelected);
+		}
+		if (timeSelected) {
+			console.log("Time Control (seconds):", timeSelected);
+			const timeInSeconds = parseInt(timeSelected, 10);
+			setWhiteTime(timeInSeconds);
+			setBlackTime(timeInSeconds);
+		}
+	}, [params]);
+
 	const onUserMove = (info: ChessMoveInfo) => {
 		const { from, to, promotion } = info.move;
+		const { levelSelected } = params;
+
 		// Update the game instance with the move
 		game.move({
 			from: from,
@@ -135,7 +155,7 @@ export default function GameScreen() {
 		setFen(game.fen());
 
 		// Update history
-		// setHistory(game.history());
+		setHistory(game.history());
 
 		const { fen, game_over, in_check, in_checkmate, in_draw, in_stalemate } =
 			info.state;
@@ -145,7 +165,7 @@ export default function GameScreen() {
 
 		// Then ask Stockfish to think...
 		if (!game_over && activeColor === "b") {
-			analyzePosition(info.state.fen);
+			analyzePosition(info.state.fen, parseInt(levelSelected, 10) || 1);
 		}
 
 		// Game over logic
@@ -168,7 +188,7 @@ export default function GameScreen() {
 		setFen(game.fen());
 
 		// Update the history
-		// setHistory(game.history());
+		setHistory(game.history());
 
 		// Update the board display
 		if (chessRef.current) {
@@ -194,15 +214,18 @@ export default function GameScreen() {
 
 	// Rematch → clear history, reset overlay & clocks, bump gameKey
 	const rematch = () => {
-		// setHistory([]);
+		setHistory([]);
 
 		setGameOver({ over: false, resultText: "", winner: null });
 
 		setGameKey((k) => k + 1);
 
-		setWhiteTime(300);
-
-		setBlackTime(300);
+		// Reset time based on initial params if available, otherwise default
+		const initialTime = params.timeSelected
+			? parseInt(params.timeSelected, 10)
+			: 300;
+		setWhiteTime(initialTime);
+		setBlackTime(initialTime);
 	};
 
 	useEffect(() => {
@@ -254,11 +277,11 @@ export default function GameScreen() {
 		};
 	}, []);
 
-	// useEffect(() => {
-	// 	if (history.length > 0) {
-	// 		listRef.current?.scrollToEnd({ animated: true });
-	// 	}
-	// }, [history]);
+	useEffect(() => {
+		if (history.length > 0) {
+			listRef.current?.scrollToEnd({ animated: true });
+		}
+	}, [history]);
 
 	return (
 		<ThemedView className="flex-1 bg-gray-50 dark:bg-black">
@@ -337,7 +360,7 @@ export default function GameScreen() {
 				<Text className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 pl-4">
 					Moves
 				</Text>
-				{/* <FlatList
+				<FlatList
 					ref={listRef}
 					data={history}
 					horizontal
@@ -366,7 +389,7 @@ export default function GameScreen() {
 						// You'll need to estimate or calculate itemWidth + marginRight
 						({ length: 100, offset: 100 * index, index }) // Replace 100 with actual item width + margin
 					}
-				/> */}
+				/>
 			</View>
 
 			{/* Bottom Controls */}

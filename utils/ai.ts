@@ -59,8 +59,8 @@ export async function analyzePosition(
 	// Smart thinking time: from 200ms to 3000ms
 	const movetime = 200 + skill * 140;
 
-	// Smart depth cap: from 4 to 18
-	const depth = 4 + Math.floor(skill * 0.7);
+	// Smart depth cap: from 2 to 18
+	const depth = 2 + Math.floor(skill * 0.7);
 
 	// If skill is low, use movetime to allow blunders (fun for players)
 	if (skill <= 5) {
