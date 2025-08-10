@@ -49,9 +49,9 @@ export default function HomeScreen() {
 
 			<View className="flex-row flex-wrap justify-center px-4 pb-6">
 				{[
-					{ icon: "cpu", label: "Play vs AI", route: "/play-options" },
+					{ icon: "cpu", label: "Play vs AI", route: "/play-options" as const },
 					{ icon: "globe", label: "Play Online", route: null },
-					{ icon: "users", label: "Pass & Play", route: null },
+					{ icon: "users", label: "Challenge Friends", route: "/challenge-friends" as const },
 					{ icon: "bar-chart-2", label: "Stats", route: null },
 				].map(({ icon, label, route }) => (
 					<TouchableOpacity
@@ -67,7 +67,7 @@ export default function HomeScreen() {
 							<Feather name={icon as any} size={40} color="white" />
 							<Text
 								style={{ fontFamily: "Montserrat-Regular" }}
-								className="mt-2 text-lg font-medium text-white text-center"
+								className="mt-2 text-lg font-medium text-white text-center text-wrap"
 							>
 								{label}
 							</Text>

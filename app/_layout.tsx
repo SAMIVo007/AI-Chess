@@ -22,6 +22,7 @@ configureReanimatedLogger({
 
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import AuthContextProvider, { useAuth } from "@/context/AuthContext";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -43,28 +44,55 @@ export default function RootLayout() {
 	}
 
 	return (
-		<GestureHandlerRootView>
-			<ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-				<Stack>
-					<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-					<Stack.Screen
-						name="game"
-						options={{
-							headerShown: false,
-						}}
-					/>
-					<Stack.Screen
-						name="play-options"
-						options={{
-							title: "Play Options",
-							headerTitleAlign: "center",
-						}}
-					/>
-					<Stack.Screen name="+not-found" />
-				</Stack>
-
-				<StatusBar style="auto" />
-			</ThemeProvider>
-		</GestureHandlerRootView>
+		<AuthContextProvider>
+			<GestureHandlerRootView>
+				<ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+					<AppNavigator />
+					<StatusBar style="auto" />
+				</ThemeProvider>
+			</GestureHandlerRootView>
+		</AuthContextProvider>
 	);
 }
+
+export const AppNavigator = () => {
+	const { session } = useAuth();
+
+	return (
+		<Stack>
+			<Stack.Protected guard={!!session}>
+				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+				<Stack.Screen
+					name="game"
+					options={{
+						headerShown: false,
+					}}
+				/>
+				<Stack.Screen
+					name="play-options"
+					options={{
+						title: "Play Options",
+						headerTitleAlign: "center",
+					}}
+				/>
+				<Stack.Screen
+					name="challenge-friends"
+					options={{
+						title: "Challenge Friends",
+						headerTitleAlign: "center",
+					}}
+				/>
+				<Stack.Screen name="+not-found" />
+			</Stack.Protected>
+
+			<Stack.Protected guard={!session}>
+				<Stack.Screen
+					name="auth"
+					options={{
+						headerShown: false,
+					}}
+				/>
+			</Stack.Protected>
+		</Stack>
+	);
+};

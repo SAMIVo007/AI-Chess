@@ -4,8 +4,8 @@
 		"slug": "AI-Chess",
 		"version": "1.0.0",
 		"orientation": "portrait",
-		"icon": "./assets/images/icon.png",
-		"scheme": "myapp",
+		"icon": "./assets/images/meme-icon.png",
+		"scheme": "AIChess",
 		"userInterfaceStyle": "automatic",
 		"newArchEnabled": true,
 		"ios": {
@@ -14,10 +14,10 @@
 		},
 		"android": {
 			"adaptiveIcon": {
-				"foregroundImage": "./assets/images/adaptive-icon.png",
-				"backgroundColor": "#ffffff"
+				"foregroundImage": "./assets/images/meme-icon.png",
+				"backgroundColor": "#000000"
 			},
-			"package": "com.samivo.AIChess",
+			"package": "com.samivo.AIChess.dev",
 			"edgeToEdgeEnabled": true
 		},
 		"web": {
@@ -40,6 +40,12 @@
 		],
 		"experiments": {
 			"typedRoutes": true
+		},
+		"extra": {
+			"router": {},
+			"eas": {
+				"projectId": "aafa8bda-d6da-4b04-a1e0-5e2b4a6478f2"
+			}
 		}
 	}
 }
