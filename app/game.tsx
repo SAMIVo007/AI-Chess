@@ -16,6 +16,8 @@ import { Chess, Square as SquareNotation } from "chess.js";
 import { startEngine, analyzePosition, stopEngine } from "@/utils/ai";
 import { speakMove } from "@/utils/voice";
 import { PieceType } from "chess.js";
+import { supabase } from "@/utils/supabase";
+import { useAuth } from "@/context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
@@ -93,10 +95,15 @@ const getDescriptiveMove = (
 
 export default function GameScreen() {
 	const router = useRouter();
-	const params = useLocalSearchParams<{
+	const { session } = useAuth();
+	const { levelSelected, timeSelected, vsAI, gameId } = useLocalSearchParams<{
 		levelSelected: string;
 		timeSelected: string;
+		vsAI: "true" | "false";
+		gameId?: string;
 	}>();
+
+	console.log("Game params:", { levelSelected, timeSelected, vsAI, gameId });
 
 	const [game] = useState(() => new Chess());
 	const [fen, setFen] = useState(game.fen());
@@ -110,46 +117,224 @@ export default function GameScreen() {
 	// Game-over overlay state
 	const [gameOver, setGameOver] = useState<{
 		over: boolean;
-
 		resultText: string;
-
 		winner: "w" | "b" | null;
 	}>({ over: false, resultText: "", winner: null });
 
+	// Online multiplayer state
+	const [isPlayerWhite, setIsPlayerWhite] = useState<boolean | null>(null);
+	const [opponentName, setOpponentName] = useState<string>("Opponent");
+	const [isMyTurn, setIsMyTurn] = useState(false);
+
 	// Voice toggle (optional)
 	const [voiceOn, setVoiceOn] = useState(true);
+	const voiceOnRef = useRef(voiceOn);
 
-	// clocks
-	const [whiteTime, setWhiteTime] = useState(300);
-	const [blackTime, setBlackTime] = useState(300);
+	// Chess clocks with active player tracking
+	const [whiteTime, setWhiteTime] = useState<number | undefined>(
+		timeSelected ? parseInt(timeSelected, 10) : 300
+	);
+	const [blackTime, setBlackTime] = useState<number | undefined>(
+		timeSelected ? parseInt(timeSelected, 10) : 300
+	);
+	const [activePlayer, setActivePlayer] = useState<"w" | "b">("w"); // White starts
+	const [gameStarted, setGameStarted] = useState(false);
+
+	// Timer refs for cleanup
+	const timerRef = useRef<number | null>(null); // Keep as number for setInterval ID
 
 	const chessRef = useRef<ChessboardRef>(null);
 	const listRef = useRef<FlatList<string>>(null);
 
+	// Keep voiceOnRef updated with current voiceOn value
 	useEffect(() => {
-		const { levelSelected, timeSelected } = params;
+		voiceOnRef.current = voiceOn;
+	}, [voiceOn]);
 
-		if (levelSelected) {
-			console.log("AI Difficulty Level:", levelSelected);
+	// Initialize online game and set up real-time subscription
+	useEffect(() => {
+		if (vsAI === "false" && gameId) {
+			initializeOnlineGame();
 		}
-		if (timeSelected) {
+	}, [gameId, vsAI]);
+
+	const initializeOnlineGame = async () => {
+		if (!gameId || !session) return;
+
+		try {
+			// Fetch game data
+			const { data: gameData, error } = await supabase
+				.from("games")
+				.select("*")
+				.eq("id", gameId)
+				.single();
+
+			if (error) {
+				console.error("Error fetching game:", error);
+				return;
+			}
+
+			// Determine if current user is white or black
+			const isWhite = gameData.white_player_id === session.user.id;
+			setIsPlayerWhite(isWhite);
+			
+			// Load game state if it exists
+			if (gameData.fen) {
+				game.load(gameData.fen);
+				setFen(gameData.fen);
+				setHistory(game.history());
+			}
+
+			// Set turn
+			const currentTurn = game.turn();
+			setIsMyTurn((isWhite && currentTurn === 'w') || (!isWhite && currentTurn === 'b'));
+			setActivePlayer(currentTurn as "w" | "b");
+
+			// Set up real-time subscription
+			const channel = supabase
+				.channel(`game-${gameId}`)
+				.on(
+					'postgres_changes',
+					{
+						event: 'UPDATE',
+						schema: 'public',
+						table: 'games',
+						filter: `id=eq.${gameId}`,
+					},
+					(payload) => {
+						console.log('Game state updated!', payload.new);
+						const newFen = payload.new.fen;
+						
+						if (newFen && newFen !== game.fen()) {
+							game.load(newFen);
+							setFen(newFen);
+							setHistory(game.history());
+							
+							// Update board visual
+							if (chessRef.current) {
+								chessRef.current.resetBoard(newFen);
+							}
+
+							// Update turn
+							const currentTurn = game.turn();
+							setIsMyTurn((isPlayerWhite && currentTurn === 'w') || (!isPlayerWhite && currentTurn === 'b'));
+							setActivePlayer(currentTurn as "w" | "b");
+
+							// Check for game over
+							if (game.game_over()) {
+								let resultText = "";
+								if (game.in_checkmate()) {
+									const winner = game.turn() === 'w' ? 'b' : 'w';
+									resultText = winner === 'w' ? "White wins!" : "Black wins!";
+									setGameOver({ over: true, resultText, winner });
+								} else {
+									resultText = "It's a draw!";
+									setGameOver({ over: true, resultText, winner: null });
+								}
+							}
+						}
+					}
+				)
+				.subscribe();
+
+			// Cleanup function
+			return () => {
+				supabase.removeChannel(channel);
+			};
+		} catch (error) {
+			console.error("Error initializing online game:", error);
+		}
+	};
+
+	// Start/stop timer logic
+	useEffect(() => {
+		if (!!timeSelected && gameStarted && !gameOver.over) {
+			timerRef.current = setInterval(() => {
+				if (activePlayer === "w") {
+					setWhiteTime((prev = 0) => {
+						if (prev <= 1) {
+							// White time runs out
+							setGameOver({
+								over: true,
+								resultText: "Time's up! Black wins!",
+								winner: "b",
+							});
+							return 0;
+						}
+						return prev - 1;
+					});
+				} else {
+					setBlackTime((prev = 0) => {
+						if (prev <= 1) {
+							// Black time runs out
+							setGameOver({
+								over: true,
+								resultText: "Time's up! White wins!",
+								winner: "w",
+							});
+							return 0;
+						}
+						return prev - 1;
+					});
+				}
+			}, 1000);
+		} else {
+			if (timerRef.current) {
+				clearInterval(timerRef.current);
+				timerRef.current = null;
+			}
+		}
+
+		return () => {
+			if (timerRef.current) {
+				clearInterval(timerRef.current);
+			}
+		};
+	}, [gameStarted, activePlayer, gameOver.over]);
+
+	useEffect(() => {
+		if (levelSelected) {
+			console.log("AI Difficulty Level (from params):", levelSelected);
+		}
+		if (!!timeSelected) {
 			console.log("Time Control (seconds):", timeSelected);
 			const timeInSeconds = parseInt(timeSelected, 10);
-			setWhiteTime(timeInSeconds);
-			setBlackTime(timeInSeconds);
+			// Only set initial times if the game hasn't started
+			// and params are actually available.
+			if (!gameStarted && timeInSeconds > 0) {
+				setWhiteTime(timeInSeconds);
+				setBlackTime(timeInSeconds);
+			}
 		}
-	}, [params]);
+	}, [levelSelected, timeSelected, gameStarted]); // Updated dependencies
 
-	const onUserMove = (info: ChessMoveInfo) => {
+
+
+	const onUserMove = async (info: ChessMoveInfo) => {
 		const { from, to, promotion } = info.move;
-		const { levelSelected } = params;
+
+		// For online games, check if it's the player's turn
+		if (vsAI === "false" && !isMyTurn) {
+			console.log("Not your turn!");
+			return;
+		}
+
+		// Start the game timer on first move
+		if (!gameStarted) {
+			setGameStarted(true);
+		}
 
 		// Update the game instance with the move
-		game.move({
+		const moveResult = game.move({
 			from: from,
 			to: to,
 			promotion: promotion || undefined,
 		});
+
+		if (!moveResult) {
+			console.log("Invalid move");
+			return;
+		}
 
 		// Update the FEN state
 		setFen(game.fen());
@@ -163,12 +348,43 @@ export default function GameScreen() {
 		const activeColor = fen.split(" ")[1]; // "b" or "w"
 		console.log("Active color:", activeColor);
 
-		// Then ask Stockfish to think...
-		if (!game_over && activeColor === "b") {
-			analyzePosition(info.state.fen, parseInt(levelSelected, 10) || 1);
+		// Switch active player for timer
+		setActivePlayer(activeColor as "w" | "b");
+
+		// Handle different game modes
+		if (vsAI === "true") {
+			// AI Game Logic
+			if (!game_over && activeColor === "b") {
+				const difficultyLevel = levelSelected ? parseInt(levelSelected, 10) : 1;
+				console.log("Requesting AI move with difficulty:", difficultyLevel);
+				analyzePosition(info.state.fen, difficultyLevel).catch((error) => {
+					console.error("Error requesting AI move:", error);
+				});
+			}
+		} else if (vsAI === "false" && gameId) {
+			// Online Multiplayer Logic
+			try {
+				const { error } = await supabase
+					.from("games")
+					.update({ 
+						fen: game.fen(), 
+						pgn: game.pgn(),
+						status: game_over ? "completed" : "active"
+					})
+					.eq("id", gameId);
+
+				if (error) {
+					console.error("Error updating game:", error);
+				} else {
+					// Update turn state
+					setIsMyTurn(false);
+				}
+			} catch (error) {
+				console.error("Error making online move:", error);
+			}
 		}
 
-		// Game over logic
+		// Game over logic (same for both modes)
 		if (game_over) {
 			let resultText = "";
 			if (in_checkmate) {
@@ -182,7 +398,15 @@ export default function GameScreen() {
 
 	const handleUndo = () => {
 		// Undo the last move in the chess.js instance
-		game.undo();
+		game.undo(); // User's move
+		// If it was AI's turn before user's undo, undo AI's move as well
+		if (
+			game.history().length > 0 &&
+			game.turn() === "b" &&
+			activePlayer === "w"
+		) {
+			game.undo(); // AI's move
+		}
 
 		// Update the FEN state to reflect the new board position
 		setFen(game.fen());
@@ -193,6 +417,12 @@ export default function GameScreen() {
 		// Update the board display
 		if (chessRef.current) {
 			chessRef.current.resetBoard(game.fen());
+		}
+		// After undo, it's current turn's player
+		setActivePlayer(game.turn() as "w" | "b");
+		// If history is empty, game hasn't started
+		if (game.history().length === 0) {
+			setGameStarted(false);
 		}
 	};
 
@@ -213,27 +443,64 @@ export default function GameScreen() {
 	};
 
 	// Rematch → clear history, reset overlay & clocks, bump gameKey
-	const rematch = () => {
+	const rematch = async () => {
+		// Reset game instance
+		game.reset();
+		setFen(game.fen());
 		setHistory([]);
 
+		// Reset game state
 		setGameOver({ over: false, resultText: "", winner: null });
-
 		setGameKey((k) => k + 1);
+		setGameStarted(false);
+		setActivePlayer("w");
 
 		// Reset time based on initial params if available, otherwise default
-		const initialTime = params.timeSelected
-			? parseInt(params.timeSelected, 10)
-			: 300;
+		const initialTime = timeSelected ? parseInt(timeSelected, 10) : 300;
 		setWhiteTime(initialTime);
 		setBlackTime(initialTime);
+
+		// Clear any existing timer
+		if (timerRef.current) {
+			clearInterval(timerRef.current);
+			timerRef.current = null;
+		}
+
+		// Reset the visual board
+		chessRef.current?.resetBoard(game.fen());
+
+		// For online games, update the database
+		if (vsAI === "false" && gameId) {
+			try {
+				const { error } = await supabase
+					.from("games")
+					.update({ 
+						fen: game.fen(), 
+						pgn: game.pgn(),
+						status: "active"
+					})
+					.eq("id", gameId);
+
+				if (error) {
+					console.error("Error resetting online game:", error);
+				} else {
+					// Reset turn state
+					setIsMyTurn(isPlayerWhite === true);
+				}
+			} catch (error) {
+				console.error("Error resetting game:", error);
+			}
+		}
 	};
 
+	// stockfish initialization
 	useEffect(() => {
 		const initializeGame = async () => {
 			const onLine = async (line: string) => {
 				console.log("Stockfish →", line);
 				if (line.startsWith("bestmove")) {
 					const uci = line.split(" ")[1];
+					console.log("Received bestmove:", uci);
 
 					if (uci && chessRef.current) {
 						// First parse the move
@@ -255,25 +522,43 @@ export default function GameScreen() {
 						// Also update the game state
 						game.move({ from, to, promotion });
 
-						// Update state
+						// Update state and switch active player
 						setFen(game.fen());
-						// setHistory(game.history());
+						setHistory(game.history()); // Ensure history is updated
+						setActivePlayer("w"); // After AI (black) moves, it's white's turn
 
 						// Voice feedback
-						if (voiceOn) {
+						if (voiceOnRef.current) {
 							speakMove(moveDescription);
 						}
 					}
 				}
 			};
 
+			console.log("Initializing game with Stockfish...");
+
 			// start the engine + listener
-			await startEngine(onLine);
+			try {
+				await startEngine(onLine);
+				console.log("Stockfish initialization completed");
+			} catch (error) {
+				console.error("Failed to initialize Stockfish:", error);
+			}
 		};
-		initializeGame();
+
+		if (vsAI === "true") {
+			initializeGame();
+		}
 
 		return () => {
-			stopEngine();
+			if (vsAI === "true") {
+				console.log("Game component cleanup - stopping engine");
+				stopEngine();
+			}
+
+			if (timerRef.current) {
+				clearInterval(timerRef.current);
+			}
 		};
 	}, []);
 
@@ -288,19 +573,19 @@ export default function GameScreen() {
 			{/* Top Bar */}
 			<View className="flex-row items-center justify-between px-4 pt-12 pb-4">
 				<TouchableOpacity onPress={() => router.back()} className="p-2">
-					<MaterialIcons name="arrow-back-ios" size={24} color="#333" />
+					<MaterialIcons name="arrow-back-ios" size={24} color="lightgray" />
 				</TouchableOpacity>
 				<Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-					Current Game
+					{!!timeSelected ? "Time Attack" : "Unlimited Time"}
 				</Text>
 				<TouchableOpacity className="p-2">
-					<MaterialIcons name="settings" size={24} color="#333" />
+					<MaterialIcons name="settings" size={24} color="lightgray" />
 				</TouchableOpacity>
 			</View>
 
 			{/* Players & Clocks */}
-			<View className="flex-row justify-between px-6 mb-4">
-				{/* White */}
+			<View className="flex-row justify-between px-12 mt-4">
+				{/* White Player */}
 				<View className="items-center">
 					<Image
 						source={{
@@ -310,16 +595,31 @@ export default function GameScreen() {
 						style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
 					/>
 					<Text className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">
-						Alice
+						{vsAI === "true" 
+							? "You" 
+							: (isPlayerWhite ? session?.user.aud : opponentName)
+						}
 					</Text>
-					<View className="mt-1 px-3 py-1 bg-white dark:bg-gray-800 rounded-full shadow">
-						<Text className="text-sm font-mono text-gray-800 dark:text-gray-200">
-							{formatTime(whiteTime)}
+					<View
+						className={`mt-1 px-3 py-1 rounded-full shadow ${
+							activePlayer === "w" && gameStarted && !gameOver.over
+								? "bg-green-500"
+								: "bg-white dark:bg-gray-800"
+						}`}
+					>
+						<Text
+							className={`text-sm font-mono ${
+								activePlayer === "w" && gameStarted && !gameOver.over
+									? "text-white font-bold"
+									: "text-gray-800 dark:text-gray-200"
+							}`}
+						>
+							{!!timeSelected ? formatTime(whiteTime || 0) : "∞"}
 						</Text>
 					</View>
 				</View>
 
-				{/* Black */}
+				{/* Black Player */}
 				<View className="items-center">
 					<Image
 						source={{
@@ -329,11 +629,26 @@ export default function GameScreen() {
 						style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
 					/>
 					<Text className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">
-						Bob
+						{vsAI === "true" 
+							? "AI" 
+							: (isPlayerWhite ? opponentName : session?.user.aud)
+						}
 					</Text>
-					<View className="mt-1 px-3 py-1 bg-white dark:bg-gray-800 rounded-full shadow">
-						<Text className="text-sm font-mono text-gray-800 dark:text-gray-200">
-							{formatTime(blackTime)}
+					<View
+						className={`mt-1 px-3 py-1 rounded-full shadow ${
+							activePlayer === "b" && gameStarted && !gameOver.over
+								? "bg-green-500"
+								: "bg-white dark:bg-gray-800"
+						}`}
+					>
+						<Text
+							className={`text-sm font-mono ${
+								activePlayer === "b" && gameStarted && !gameOver.over
+									? "text-white font-bold"
+									: "text-gray-800 dark:text-gray-200"
+							}`}
+						>
+							{!!timeSelected ? formatTime(blackTime || 0) : "∞"}
 						</Text>
 					</View>
 				</View>
@@ -345,7 +660,7 @@ export default function GameScreen() {
 					ref={chessRef}
 					// fen={fen}
 					boardSize={width}
-					gestureEnabled={true}
+					gestureEnabled={vsAI === "true" ? true : isMyTurn}
 					onMove={onUserMove}
 					durations={{ move: 150 }}
 					colors={{
@@ -354,6 +669,17 @@ export default function GameScreen() {
 					}}
 				/>
 			</View>
+
+			{/* Turn Indicator for Online Games */}
+			{vsAI === "false" && (
+				<View className="py-2 px-4">
+					<Text className={`text-center text-lg font-semibold ${
+						isMyTurn ? "text-green-600" : "text-orange-600"
+					}`}>
+						{isMyTurn ? "Your Turn" : "Opponent's Turn"}
+					</Text>
+				</View>
+			)}
 
 			{/* Move List */}
 			<View className="py-2 h-[4.6rem] border-t border-gray-200 dark:border-gray-700">
@@ -384,10 +710,11 @@ export default function GameScreen() {
 					onContentSizeChange={() =>
 						listRef.current?.scrollToEnd({ animated: true })
 					}
-					getItemLayout={(data, index) =>
-						// Assuming each item has roughly the same width for horizontal list
-						// You'll need to estimate or calculate itemWidth + marginRight
-						({ length: 100, offset: 100 * index, index }) // Replace 100 with actual item width + margin
+					getItemLayout={
+						(data, index) =>
+							// Assuming each item has roughly the same width for horizontal list
+							// You'll need to estimate or calculate itemWidth + marginRight
+							({ length: 100, offset: 100 * index, index }) // Replace 100 with actual item width + margin
 					}
 				/>
 			</View>
@@ -402,7 +729,7 @@ export default function GameScreen() {
 					/>
 				</TouchableOpacity>
 				<TouchableOpacity className="p-2" onPress={handleUndo}>
-					<MaterialIcons name="undo" size={28} color="#333" />
+					<MaterialIcons name="undo" size={28} color="lightgray" />
 				</TouchableOpacity>
 				<TouchableOpacity className="p-2">
 					<MaterialIcons name="flag" size={28} color="#e53935" />

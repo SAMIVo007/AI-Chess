@@ -12,7 +12,7 @@ import Slider from "@react-native-community/slider";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Switch } from "@expo/ui/jetpack-compose";
-
+import { opacity } from "react-native-reanimated/lib/typescript/Colors";
 
 const { width } = Dimensions.get("window");
 
@@ -22,7 +22,6 @@ export default function PlayOptions() {
 	const [difficulty, setDifficulty] = useState(1); // 0-20
 	const [timeControl, setTimeControl] = useState(300); // seconds
 	const [checked, setChecked] = useState(false); // toggle for time control
-
 	const timeOptions = [60, 180, 300, 600, 900];
 
 	return (
@@ -54,19 +53,28 @@ export default function PlayOptions() {
 
 				{/* Time Control */}
 				<View className="mb-8">
-					<View className="flex-row items-center justify-between mb-2">
+					<View className="flex-row items-center justify-between mb-1">
 						<ThemedText className="mb-2 text-lg font-medium">Time Control</ThemedText>
 						<Switch
 							value={checked}
 							onValueChange={(checked) => {
 								setChecked(checked);
+								console.log(`Time control ${checked ? "enabled" : "disabled"}`);
 							}}
-							color="#ff0000"
-							label="Play music"
+							elementColors={{
+								checkedThumbColor: "#4caf50",
+								checkedTrackColor: "#1e3728",
+								uncheckedThumbColor: "#6bac6d",
+								uncheckedTrackColor: "#1e3728",
+							}}
 							variant="switch"
+							style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
 						/>
 					</View>
-					<View className="flex-row flex-wrap gap-3">
+					<View
+						className="flex-row flex-wrap gap-3"
+						style={checked ? { opacity: 1 } : { opacity: 0.5, pointerEvents: "none" }}
+					>
 						{timeOptions.map((sec) => (
 							<TouchableOpacity
 								key={sec}
@@ -106,7 +114,8 @@ export default function PlayOptions() {
 							pathname: "/game",
 							params: {
 								levelSelected: difficulty,
-								timeSelected: timeControl,
+								...(checked && { timeSelected: timeControl }), // Only include timeSelected if switch is checked
+								vsAI: "true", // Always true for AI game
 							},
 						})
 					}
