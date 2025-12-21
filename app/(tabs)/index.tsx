@@ -51,7 +51,7 @@ export default function HomeScreen() {
 				{[
 					{ icon: "cpu", label: "Play vs AI", route: "/play-options" as const },
 					{ icon: "globe", label: "Play Online", route: null },
-					{ icon: "users", label: "Challenge Friends", route: "/challenge-friends" as const },
+					{ icon: "users", label: "Play with Friends", route: "/challenge-friends" as const },
 					{ icon: "bar-chart-2", label: "Stats", route: null },
 				].map(({ icon, label, route }) => (
 					<TouchableOpacity

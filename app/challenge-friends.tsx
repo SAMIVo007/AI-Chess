@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
 	View,
 	Text,
@@ -7,7 +7,6 @@ import {
 	Dimensions,
 	FlatList,
 	Alert,
-	Share,
 } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -15,33 +14,30 @@ import { Feather, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/utils/supabase";
+import BottomSheet from "@gorhom/bottom-sheet";
+import { JoinGameModal } from "@/components/JoinGameModal";
+import { Friend } from "@/constants/Types";
+import { CreateGameModal } from "@/components/CreateGameModal";
 
 const { width } = Dimensions.get("window");
-
-interface Friend {
-	id: string;
-	username: string;
-	email: string;
-	last_seen: string;
-	status: "online" | "offline";
-}
-
-interface GameInvite {
-	id: string;
-	invite_code: string;
-	created_at: string;
-	expires_at: string;
-	status: "pending" | "accepted" | "expired";
-}
 
 export default function ChallengeFriends() {
 	const router = useRouter();
 	const { session } = useAuth();
 
 	const [friends, setFriends] = useState<Friend[]>([]);
-	const [gameInvite, setGameInvite] = useState<GameInvite | null>(null);
-	const [loading, setLoading] = useState(false);
+
 	const [loadingFriends, setLoadingFriends] = useState(true);
+
+	// Join game modal
+	const [isJoinModalVisible, setIsJoinModalVisible] = useState(false);
+	// ref
+	const joinBottomSheetRef = useRef<BottomSheet>(null);
+	const createBottomSheetRef = useRef<BottomSheet>(null);
+	// callbacks
+	const handleSheetChanges = useCallback((index: number) => {
+		console.log("handleSheetChanges", index);
+	}, []);
 
 	// Mock friends data - replace with actual API call
 	useEffect(() => {
@@ -88,60 +84,6 @@ export default function ChallengeFriends() {
 			console.error("Error loading friends:", error);
 		} finally {
 			setLoadingFriends(false);
-		}
-	};
-
-	const generateInviteLink = async () => {
-		if (!session?.user?.id) return;
-
-		setLoading(true);
-		try {
-			// Generate a unique invite code
-			const inviteCode = Math.random().toString(36).substring(2, 15);
-			const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
-
-			// Create a pending game in the database
-			const { data: gameData, error: gameError } = await supabase
-				.from("games")
-				.insert({
-					white_player_id: session.user.id,
-					black_player_id: null,
-					fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-					pgn: "",
-					status: "waiting",
-					invite_code: inviteCode,
-					expires_at: expiresAt.toISOString(),
-				})
-				.select()
-				.single();
-
-			if (gameError) {
-				throw gameError;
-			}
-
-			const invite: GameInvite = {
-				id: gameData.id,
-				invite_code: inviteCode,
-				created_at: gameData.created_at,
-				expires_at: expiresAt.toISOString(),
-				status: "pending",
-			};
-
-			setGameInvite(invite);
-
-			// Generate shareable link
-			const inviteLink = `https://aichess.app/join/${inviteCode}`;
-
-			// Share the link
-			await Share.share({
-				message: `Join me for a chess game! Click this link to play: ${inviteLink}`,
-				title: "Chess Game Invitation",
-			});
-		} catch (error) {
-			console.error("Error generating invite:", error);
-			Alert.alert("Error", "Failed to generate invite link. Please try again.");
-		} finally {
-			setLoading(false);
 		}
 	};
 
@@ -197,19 +139,31 @@ export default function ChallengeFriends() {
 	);
 
 	return (
-		<ThemedView className="flex-1 px-6 pt-12 bg-white dark:bg-black">
-			<ScrollView showsVerticalScrollIndicator={false}>
+		<ThemedView className="flex-1 px-6 bg-white dark:bg-black">
+			<ScrollView
+				showsVerticalScrollIndicator={false}
+				contentContainerStyle={{ paddingBottom: 32, paddingTop: 32 }}
+			>
 				{/* Generate Link Section */}
 				<View className="mb-8">
-					<ThemedText className="mb-4 text-lg font-medium">
-						Share Game Link
-					</ThemedText>
+					<ThemedText className="mb-1 text-lg font-medium">Join a game</ThemedText>
 					<Text className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-						Generate a link to share with anyone. They can join your game by clicking
-						the link.
+						Enter the invite code to join a game.
 					</Text>
 
-					{gameInvite ? (
+					<TouchableOpacity
+						onPress={() => joinBottomSheetRef.current?.expand()}
+						className="rounded-xl py-4 bg-blue-600"
+					>
+						<View className="flex-row items-center justify-center">
+							<Feather name="plus-circle" size={20} color="white" />
+							<Text className="ml-2 text-center text-white font-bold text-lg">
+								Join Game
+							</Text>
+						</View>
+					</TouchableOpacity>
+
+					{/* {gameInvite ? (
 						<View className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
 							<View className="flex-row items-center mb-2">
 								<Feather name="check-circle" size={18} color="#22c55e" />
@@ -221,7 +175,7 @@ export default function ChallengeFriends() {
 								Code: {gameInvite.invite_code}
 							</Text>
 							<TouchableOpacity
-								onPress={generateInviteLink}
+								onPress={generateInvite}
 								className="bg-green-600 rounded-lg py-2"
 							>
 								<Text className="text-center text-white font-semibold">
@@ -231,7 +185,7 @@ export default function ChallengeFriends() {
 						</View>
 					) : (
 						<TouchableOpacity
-							onPress={generateInviteLink}
+							onPress={generateInvite}
 							disabled={loading}
 							className={`rounded-xl py-4 ${loading ? "bg-gray-400" : "bg-blue-600"}`}
 						>
@@ -246,7 +200,7 @@ export default function ChallengeFriends() {
 								</Text>
 							</View>
 						</TouchableOpacity>
-					)}
+					)} */}
 				</View>
 
 				{/* Friends List Section */}
@@ -311,20 +265,30 @@ export default function ChallengeFriends() {
 						</Text>
 					</View>
 				</View>
-
-				{/* Quick Play Button */}
-				<TouchableOpacity
-					className="bg-orange-600 rounded-xl py-4 mt-6"
-					onPress={() => router.push("/play-options")}
-				>
-					<View className="flex-row items-center justify-center">
-						<MaterialIcons name="flash-on" size={24} color="white" />
-						<Text className="ml-2 text-center text-white font-bold text-lg">
-							Play vs AI Instead
-						</Text>
-					</View>
-				</TouchableOpacity>
 			</ScrollView>
+
+			{/* Quick Play Button */}
+			<TouchableOpacity
+				className="bg-orange-600 rounded-xl py-4 mt-6 mb-8"
+				onPress={() => createBottomSheetRef.current?.expand()}
+			>
+				<View className="flex-row items-center justify-center">
+					<MaterialIcons name="flash-on" size={24} color="white" />
+					<Text className="ml-2 text-center text-white font-bold text-lg">
+						Create New Game
+					</Text>
+				</View>
+			</TouchableOpacity>
+
+			<JoinGameModal
+				bottomSheetRef={joinBottomSheetRef}
+				handleSheetChanges={handleSheetChanges}
+			/>
+
+			<CreateGameModal
+				bottomSheetRef={createBottomSheetRef}
+				handleSheetChanges={handleSheetChanges}
+			/>
 		</ThemedView>
 	);
 }

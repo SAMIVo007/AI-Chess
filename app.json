@@ -4,26 +4,43 @@
 		"slug": "AI-Chess",
 		"version": "1.0.0",
 		"orientation": "portrait",
-		"icon": "./assets/images/meme-icon.png",
-		"scheme": "AIChess",
+		"icon": "./assets/images/AI_Chess_logo.png",
+		"scheme": "aichess",
 		"userInterfaceStyle": "automatic",
 		"newArchEnabled": true,
 		"ios": {
 			"supportsTablet": true,
-			"bundleIdentifier": "com.samivo.AIChess"
+			"bundleIdentifier": "com.samivo.AIChess",
+			"associatedDomains": ["applinks:aichess.app"]
 		},
 		"android": {
 			"adaptiveIcon": {
-				"foregroundImage": "./assets/images/meme-icon.png",
+				"foregroundImage": "./assets/images/AI_Chess_logo.png",
 				"backgroundColor": "#000000"
 			},
 			"package": "com.samivo.AIChess.dev",
-			"edgeToEdgeEnabled": true
+			"edgeToEdgeEnabled": true,
+			"intentFilters": [
+				{
+					"action": "VIEW",
+					"autoVerify": true,
+					"data": [
+						{
+							"scheme": "https",
+							"host": "aichess.app"
+						},
+						{
+							"scheme": "aichess"
+						}
+					],
+					"category": ["BROWSABLE", "DEFAULT"]
+				}
+			]
 		},
 		"web": {
 			"bundler": "metro",
 			"output": "static",
-			"favicon": "./assets/images/favicon.png"
+			"favicon": "./assets/images/AI_Chess_logo.png"
 		},
 		"plugins": [
 			"expo-router",
