@@ -2,15 +2,36 @@ import { supabase } from "@/utils/supabase";
 
 const initialFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+export interface CreateInviteOptions {
+	/** Hours until invite expires (default 24) */
+	expiresInHours?: number;
+	/** Preferred starting color for the creator. If 'random', assignment is random. */
+	colorPreference?: "white" | "black" | "random";
+	/** Optional initial FEN (defaults to standard) */
+	fen?: string;
+	/** Optional time control in seconds (store if you later add column) */
+	timeControlSeconds?: number;
+}
+
+export interface CreateInviteResult {
+	gameId: string;
+	inviteCode: string;
+	playerColor: "white" | "black";
+	expiresAt: string;
+}
+
 // Add this cleanup function
 export const cleanupExpiredGames = async () => {
 	try {
-		const { data, error } = await supabase
+		const { data, error } = (await supabase
 			.from("games")
 			.delete()
 			.eq("status", "waiting")
-			.is("black_player_id", null)
-			.lt("expires_at", new Date().toISOString()) as { data: any[] | null, error: any };
+			// .is("black_player_id", null)
+			.lt("expires_at", new Date().toISOString())) as {
+			data: any[] | null;
+			error: any;
+		};
 
 		if (error) {
 			console.error("Error cleaning up expired games:", error);
@@ -49,43 +70,84 @@ export const createNewGame = async (userId: string) => {
 	return data.id;
 };
 
-export const createGameWithInvite = async (userId: string) => {
-	// Clean up expired games when creating new invites
+// Enhanced createGameWithInvite with options & robust unique code handling
+export const createGameWithInvite = async (
+	userId: string,
+	options: CreateInviteOptions = {}
+): Promise<CreateInviteResult | null> => {
 	await cleanupExpiredGames();
 
-	const inviteCode = Math.random().toString(36).substring(2, 15);
-	const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+	const {
+		expiresInHours = 24,
+		colorPreference = "white",
+		fen = initialFen,
+	} = options;
 
-	const { data, error } = await supabase
-		.from("games")
-		.insert({
-			white_player_id: userId,
-			status: "waiting",
-			fen: initialFen,
-			pgn: "",
-			turn: "w",
-			invite_code: inviteCode,
-			expires_at: expiresAt.toISOString(),
-		})
-		.select()
-		.single();
-
-	if (error) {
-		console.error("Error creating game with invite:", error);
-		return null;
+	// Decide player color
+	let creatorColor: "white" | "black";
+	if (colorPreference === "random") {
+		creatorColor = Math.random() < 0.5 ? "white" : "black";
+	} else {
+		creatorColor = colorPreference;
 	}
 
-	return {
-		gameId: data.id,
-		inviteCode: inviteCode,
-	};
+	const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
+
+	// Attempt to insert with a unique invite_code (loop on collisions)
+	for (let attempt = 0; attempt < 5; attempt++) {
+		const inviteCode = Math.random().toString(36).slice(2, 10); // 8 chars
+		try {
+			const insertPayload: any = {
+				status: "waiting",
+				fen,
+				pgn: "",
+				turn: "w",
+				invite_code: inviteCode,
+				expires_at: expiresAt.toISOString(),
+			};
+
+			if (creatorColor === "white") {
+				insertPayload.white_player_id = userId;
+				insertPayload.black_player_id = null;
+			} else {
+				insertPayload.black_player_id = userId;
+				insertPayload.white_player_id = null;
+			}
+
+			const { data, error } = await supabase
+				.from("games")
+				.insert(insertPayload)
+				.select()
+				.single();
+
+			if (error) {
+				// Unique violation code in Postgres is 23505
+				if (error.code === "23505") {
+					console.warn("Invite code collision, retrying...");
+					continue; // try again
+				}
+				console.error("Error creating game with invite:", error);
+				return null;
+			}
+
+			return {
+				gameId: data.id,
+				inviteCode,
+				playerColor: creatorColor,
+				expiresAt: expiresAt.toISOString(),
+			};
+		} catch (e) {
+			console.error("Unexpected error creating invite (attempt", attempt, ")", e);
+		}
+	}
+
+	console.error("Failed to generate unique invite code after retries");
+	return null;
 };
 
 export const joinGameByInvite = async (inviteCode: string, userId: string) => {
-	// Clean up expired games before attempting to join
 	await cleanupExpiredGames();
 
-	// First, find the game by invite code
 	const { data: gameData, error: findError } = await supabase
 		.from("games")
 		.select("*")
@@ -99,19 +161,29 @@ export const joinGameByInvite = async (inviteCode: string, userId: string) => {
 		return null;
 	}
 
-	// Check if user is trying to join their own game
-	if (gameData.white_player_id === userId) {
-		console.error("Cannot join your own game");
+	// Prevent joining own waiting side (already assigned on that color)
+	if (
+		gameData.white_player_id === userId ||
+		gameData.black_player_id === userId
+	) {
+		console.error("Cannot join a game you created");
 		return null;
 	}
 
-	// Update the game to add the second player
+	// Determine which side is open
+	let update: Record<string, any> | null = null;
+	if (!gameData.white_player_id && gameData.black_player_id) {
+		update = { white_player_id: userId, status: "active" };
+	} else if (!gameData.black_player_id && gameData.white_player_id) {
+		update = { black_player_id: userId, status: "active" };
+	} else {
+		console.error("Game already has two players or invalid state");
+		return null;
+	}
+
 	const { error: updateError } = await supabase
 		.from("games")
-		.update({
-			black_player_id: userId,
-			status: "active",
-		})
+		.update(update)
 		.eq("id", gameData.id);
 
 	if (updateError) {
@@ -133,6 +205,22 @@ export const joinGame = async (gameId: string, userId: string) => {
 
 	if (error) {
 		console.error("Error joining game:", error);
+		return false;
+	}
+
+	return true;
+};
+
+export const isGameActive = async (gameId: string) => {
+	const { data: gameData, error } = await supabase
+		.from("games")
+		.select("*")
+		.eq("id", gameId)
+		.eq("status", "active")
+		.single();
+
+	if (error || !gameData) {
+		console.error("Game not found or not active:", error);
 		return false;
 	}
 

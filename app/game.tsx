@@ -18,6 +18,8 @@ import { speakMove } from "@/utils/voice";
 import { PieceType } from "chess.js";
 import { supabase } from "@/utils/supabase";
 import { useAuth } from "@/context/AuthContext";
+import { isGameActive } from "@/api/supabaseAPI";
+import { ActivityIndicator } from "react-native";
 
 const { width } = Dimensions.get("window");
 
@@ -124,7 +126,12 @@ export default function GameScreen() {
 	// Online multiplayer state
 	const [isPlayerWhite, setIsPlayerWhite] = useState<boolean | null>(null);
 	const [opponentName, setOpponentName] = useState<string>("Opponent");
+	const [opponentAvatar, setOpponentAvatar] = useState<string | null>(null);
+	const [myAvatar, setMyAvatar] = useState<string | null>(null);
 	const [isMyTurn, setIsMyTurn] = useState(false);
+	const [status, setStatus] = useState<
+		"pending" | "waiting" | "active" | "completed"
+	>("pending");
 
 	// Voice toggle (optional)
 	const [voiceOn, setVoiceOn] = useState(true);
@@ -158,6 +165,29 @@ export default function GameScreen() {
 		}
 	}, [gameId, vsAI]);
 
+	const fetchProfile = async (userId: string, isMe: boolean) => {
+		try {
+			const { data, error } = await supabase
+				.from("profiles")
+				.select("username, avatar_url")
+				.eq("id", userId)
+				.single();
+
+			if (data) {
+				if (isMe) {
+					// We don't usually display our own name specifically besides "You",
+					// but if we wanted to: setActivePlayerName...
+					if (data.avatar_url) setMyAvatar(data.avatar_url);
+				} else {
+					setOpponentName(data.username || "Opponent");
+					if (data.avatar_url) setOpponentAvatar(data.avatar_url);
+				}
+			}
+		} catch (e) {
+			console.error("Error fetching profile:", e);
+		}
+	};
+
 	const initializeOnlineGame = async () => {
 		if (!gameId || !session) return;
 
@@ -169,15 +199,40 @@ export default function GameScreen() {
 				.eq("id", gameId)
 				.single();
 
-			if (error) {
+			if (error || !gameData) {
 				console.error("Error fetching game:", error);
 				return;
 			}
 
+			// Store status
+			setStatus(gameData.status);
+
 			// Determine if current user is white or black
-			const isWhite = gameData.white_player_id === session.user.id;
+			// The creator is usually assigned a side.
+			// Check if we are checking waiting or active
+			let isWhite = false;
+			if (gameData.white_player_id === session.user.id) {
+				isWhite = true;
+			} else if (gameData.black_player_id === session.user.id) {
+				isWhite = false;
+			} else {
+				// If we are just viewing or it's a new joiner scenario (edge case if navigation happened before DB update?)
+				// Assuming standard flow: ID is already in DB.
+				// If waiting and I'm the creator...
+			}
+
 			setIsPlayerWhite(isWhite);
-			
+
+			// Fetch opponent profile if they exist
+			if (isWhite && gameData.black_player_id) {
+				fetchProfile(gameData.black_player_id, false);
+			} else if (!isWhite && gameData.white_player_id) {
+				fetchProfile(gameData.white_player_id, false);
+			}
+
+			// Fetch my own avatar
+			fetchProfile(session.user.id, true);
+
 			// Load game state if it exists
 			if (gameData.fen) {
 				game.load(gameData.fen);
@@ -187,29 +242,52 @@ export default function GameScreen() {
 
 			// Set turn
 			const currentTurn = game.turn();
-			setIsMyTurn((isWhite && currentTurn === 'w') || (!isWhite && currentTurn === 'b'));
+			// isMyTurn: (I am White AND Turn is White) OR (I am Black AND Turn is Black)
+			setIsMyTurn(
+				(isWhite && currentTurn === "w") || (!isWhite && currentTurn === "b")
+			);
 			setActivePlayer(currentTurn as "w" | "b");
+
+			// If game is completed/active, handle start
+			if (gameData.status === "active") {
+				setGameStarted(true);
+			}
 
 			// Set up real-time subscription
 			const channel = supabase
 				.channel(`game-${gameId}`)
 				.on(
-					'postgres_changes',
+					"postgres_changes",
 					{
-						event: 'UPDATE',
-						schema: 'public',
-						table: 'games',
+						event: "UPDATE",
+						schema: "public",
+						table: "games",
 						filter: `id=eq.${gameId}`,
 					},
 					(payload) => {
-						console.log('Game state updated!', payload.new);
-						const newFen = payload.new.fen;
-						
+						console.log("Game state updated!", payload.new);
+						const newData = payload.new;
+
+						// 1. Handle Status Change (Waiting -> Active)
+						if (newData.status === "active" && status !== "active") {
+							setStatus("active");
+							setGameStarted(true);
+							// Opponent joined!
+							// If I am white, opponent is black
+							if (isWhite && newData.black_player_id) {
+								fetchProfile(newData.black_player_id, false);
+							} else if (!isWhite && newData.white_player_id) {
+								fetchProfile(newData.white_player_id, false);
+							}
+						}
+
+						// 2. Handle Moves (FEN Updates)
+						const newFen = newData.fen;
 						if (newFen && newFen !== game.fen()) {
 							game.load(newFen);
 							setFen(newFen);
 							setHistory(game.history());
-							
+
 							// Update board visual
 							if (chessRef.current) {
 								chessRef.current.resetBoard(newFen);
@@ -217,15 +295,17 @@ export default function GameScreen() {
 
 							// Update turn
 							const currentTurn = game.turn();
-							setIsMyTurn((isPlayerWhite && currentTurn === 'w') || (!isPlayerWhite && currentTurn === 'b'));
+							setIsMyTurn(
+								(isWhite && currentTurn === "w") || (!isWhite && currentTurn === "b")
+							);
 							setActivePlayer(currentTurn as "w" | "b");
 
 							// Check for game over
 							if (game.game_over()) {
 								let resultText = "";
 								if (game.in_checkmate()) {
-									const winner = game.turn() === 'w' ? 'b' : 'w';
-									resultText = winner === 'w' ? "White wins!" : "Black wins!";
+									const winner = game.turn() === "w" ? "b" : "w";
+									resultText = winner === "w" ? "White wins!" : "Black wins!";
 									setGameOver({ over: true, resultText, winner });
 								} else {
 									resultText = "It's a draw!";
@@ -308,8 +388,6 @@ export default function GameScreen() {
 		}
 	}, [levelSelected, timeSelected, gameStarted]); // Updated dependencies
 
-
-
 	const onUserMove = async (info: ChessMoveInfo) => {
 		const { from, to, promotion } = info.move;
 
@@ -366,10 +444,11 @@ export default function GameScreen() {
 			try {
 				const { error } = await supabase
 					.from("games")
-					.update({ 
-						fen: game.fen(), 
+					.update({
+						fen: game.fen(),
 						pgn: game.pgn(),
-						status: game_over ? "completed" : "active"
+						status: game_over ? "completed" : "active",
+						turn: game.turn(),
 					})
 					.eq("id", gameId);
 
@@ -474,10 +553,11 @@ export default function GameScreen() {
 			try {
 				const { error } = await supabase
 					.from("games")
-					.update({ 
-						fen: game.fen(), 
+					.update({
+						fen: game.fen(),
 						pgn: game.pgn(),
-						status: "active"
+						status: "active",
+						turn: "w",
 					})
 					.eq("id", gameId);
 
@@ -589,16 +669,23 @@ export default function GameScreen() {
 				<View className="items-center">
 					<Image
 						source={{
-							uri: "https://www.shutterstock.com/image-vector/young-smiling-man-avatar-brown-600nw-2261401207.jpg",
+							uri:
+								(isPlayerWhite
+									? vsAI === "true"
+										? null
+										: myAvatar
+									: opponentAvatar) ||
+								"https://www.shutterstock.com/image-vector/young-smiling-man-avatar-brown-600nw-2261401207.jpg",
 						}}
 						className="rounded-full"
 						style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
 					/>
 					<Text className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">
-						{vsAI === "true" 
-							? "You" 
-							: (isPlayerWhite ? session?.user.aud : opponentName)
-						}
+						{vsAI === "true"
+							? "You"
+							: isPlayerWhite
+							? session?.user.aud
+							: opponentName}
 					</Text>
 					<View
 						className={`mt-1 px-3 py-1 rounded-full shadow ${
@@ -623,16 +710,19 @@ export default function GameScreen() {
 				<View className="items-center">
 					<Image
 						source={{
-							uri: "https://www.shutterstock.com/image-vector/young-smiling-man-avatar-3d-600nw-2124054758.jpg",
+							uri:
+								(isPlayerWhite ? opponentAvatar : vsAI === "true" ? null : myAvatar) ||
+								"https://www.shutterstock.com/image-vector/young-smiling-man-avatar-3d-600nw-2124054758.jpg",
 						}}
 						className="rounded-full"
 						style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
 					/>
 					<Text className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">
-						{vsAI === "true" 
-							? "AI" 
-							: (isPlayerWhite ? opponentName : session?.user.aud)
-						}
+						{vsAI === "true"
+							? "AI"
+							: isPlayerWhite
+							? opponentName
+							: session?.user.aud}
 					</Text>
 					<View
 						className={`mt-1 px-3 py-1 rounded-full shadow ${
@@ -673,9 +763,11 @@ export default function GameScreen() {
 			{/* Turn Indicator for Online Games */}
 			{vsAI === "false" && (
 				<View className="py-2 px-4">
-					<Text className={`text-center text-lg font-semibold ${
-						isMyTurn ? "text-green-600" : "text-orange-600"
-					}`}>
+					<Text
+						className={`text-center text-lg font-semibold ${
+							isMyTurn ? "text-green-600" : "text-orange-600"
+						}`}
+					>
 						{isMyTurn ? "Your Turn" : "Opponent's Turn"}
 					</Text>
 				</View>
@@ -721,16 +813,22 @@ export default function GameScreen() {
 
 			{/* Bottom Controls */}
 			<View className="flex-row justify-around items-center py-3 border-t border-gray-200 dark:border-gray-700">
-				<TouchableOpacity onPress={() => setVoiceOn((v) => !v)} className="p-2">
-					<FontAwesome5
-						name={voiceOn ? "volume-up" : "volume-mute"}
-						size={24}
-						color={voiceOn ? "#4caf50" : "#999"}
-					/>
-				</TouchableOpacity>
-				<TouchableOpacity className="p-2" onPress={handleUndo}>
-					<MaterialIcons name="undo" size={28} color="lightgray" />
-				</TouchableOpacity>
+				{vsAI === "true" && (
+					<>
+						<TouchableOpacity onPress={() => setVoiceOn((v) => !v)} className="p-2">
+							<FontAwesome5
+								name={voiceOn ? "volume-up" : "volume-mute"}
+								size={24}
+								color={voiceOn ? "#4caf50" : "#999"}
+							/>
+						</TouchableOpacity>
+
+						<TouchableOpacity className="p-2" onPress={handleUndo}>
+							<MaterialIcons name="undo" size={28} color="lightgray" />
+						</TouchableOpacity>
+					</>
+				)}
+
 				<TouchableOpacity className="p-2">
 					<MaterialIcons name="flag" size={28} color="#e53935" />
 				</TouchableOpacity>
@@ -758,6 +856,18 @@ export default function GameScreen() {
 							</Text>
 						</TouchableOpacity>
 					</View>
+				</View>
+			)}
+
+			{vsAI === "false" && status === "waiting" && (
+				<View className="absolute inset-0 bg-black/80 items-center justify-center p-4 z-20">
+					<Text className="text-white text-xl font-bold mb-4">
+						Waiting for opponent...
+					</Text>
+					<ActivityIndicator size="large" color="#fff" />
+					<Text className="text-gray-300 mt-4 text-center">
+						Share the invite code with a friend to start playing!
+					</Text>
 				</View>
 			)}
 		</ThemedView>

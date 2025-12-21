@@ -2,40 +2,42 @@ import { supabase } from "@/utils/supabase";
 import { Session } from "@supabase/supabase-js";
 import React, { createContext, use, useEffect, useState } from "react";
 
-const AuthContext = createContext<{ session: Session | null } | null>(null);
+type AuthContextType = {
+  session: Session | null;
+  loading: boolean;
+};
+
+const AuthContext = createContext<AuthContextType>({
+  session: null,
+  loading: true,
+});
 
 export default function AuthContextProvider({
 	children,
 }: {
 	children: React.ReactNode;
 }) {
-	const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
-	useEffect(() => {
-		// Get initial session
-		const getInitialSession = async () => {
-			const {
-				data: { session },
-			} = await supabase.auth.getSession();
-			setSession(session);
-		};
+useEffect(() => {
+    // 1️⃣ Restore session on app start
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setLoading(false);
+    });
 
-		getInitialSession();
+    // 2️⃣ Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
 
-		// Listen for auth state changes
-		const {
-			data: { subscription },
-		} = supabase.auth.onAuthStateChange((_event, session) => {
-			setSession(session);
-		});
+    return () => subscription.unsubscribe();
+  }, []);
 
-		// Cleanup subscription on unmount
-		return () => {
-			subscription.unsubscribe();
-		};
-	}, []);
-
-	return <AuthContext value={{ session }}>{children}</AuthContext>;
+	return <AuthContext value={{ session, loading }}>{children}</AuthContext>;
 }
 
 export const useAuth = () => {

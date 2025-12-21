@@ -6,23 +6,10 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "android": {
-        "gradleCommand": ":app:assembleDebug",
-        "applicationIdSuffix": ".dev"
-      },
-      "ios": {
-        "bundleIdentifier": "com.samivo.AIChess.dev"
-      }
+      "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal",
-      "android": {
-        "applicationIdSuffix": ".preview"
-      },
-      "ios": {
-        "bundleIdentifier": "com.samivo.AIChess.preview"
-      }
+      "distribution": "internal"
     },
     "production": {
       "autoIncrement": true

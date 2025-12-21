@@ -39,6 +39,9 @@ export default function Auth() {
 		} = await supabase.auth.signUp({
 			email: email,
 			password: password,
+			options: {
+				emailRedirectTo: "aichess://",
+			},
 		});
 
 		if (error) Alert.alert(error.message);
