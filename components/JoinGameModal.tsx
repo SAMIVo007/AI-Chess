@@ -132,7 +132,7 @@ export const JoinGameModal = ({
 						placeholder="e.g. 123456"
 						placeholderTextColor="#999"
 						style={[styles.input, { color: textColor }]}
-						// autoCapitalize="characters"
+						autoCapitalize="none"
 						value={joinCode}
 						onChangeText={(text) => {
 							setJoinCode(text);
