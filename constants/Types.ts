@@ -50,6 +50,7 @@ export interface PieceProps {
 	row: number;
 	col: number;
 	onPress?: (row: number, col: number) => void;
+	isSelected?: boolean;
 }
 
 export interface PieceSelectorProps {

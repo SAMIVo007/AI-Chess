@@ -15,6 +15,34 @@ import PieceSelector from "./PieceSelector";
 
 const { width } = Dimensions.get("window");
 
+interface AnimatedPiece {
+	id: string;
+	type: PieceType;
+	color: PieceColor;
+	row: number;
+	col: number;
+}
+
+const getInitialPieces = (
+	board: ({ type: PieceType; color: PieceColor } | null)[][]
+) => {
+	const pieces: AnimatedPiece[] = [];
+	board.forEach((row, rowIndex) => {
+		row.forEach((piece, colIndex) => {
+			if (piece) {
+				pieces.push({
+					id: `${piece.color}-${piece.type}-${rowIndex}-${colIndex}`, // Initial stable ID
+					type: piece.type,
+					color: piece.color,
+					row: rowIndex,
+					col: colIndex,
+				});
+			}
+		});
+	});
+	return pieces;
+};
+
 const renderSquares = (
 	orientation: PieceColor,
 	onSquarePress: (row: number, col: number) => void,
@@ -56,6 +84,9 @@ export default function ChessBoard({ orientation = "w" }: BoardProps) {
 	// 2. The Board State: This 8x8 array is the ONLY state needed.
 	// It contains objects like { type: 'p', color: 'b' } or null.
 	const [board, setBoard] = useState(game.board());
+	const [pieces, setPieces] = useState<AnimatedPiece[]>(() =>
+		getInitialPieces(game.board())
+	);
 
 	// 3. Selection State (for moving)
 	const [selectedSquare, setSelectedSquare] = useState<{
@@ -126,6 +157,91 @@ export default function ChessBoard({ orientation = "w" }: BoardProps) {
 						setBoard(game.board());
 						setSelectedSquare(null);
 						setPossibleMoves([]);
+
+						// Update Pieces State for Animation
+						setPieces((prev) => {
+							const next = [...prev];
+							// 1. Find the moving piece
+							const movingPieceIndex = next.findIndex(
+								(p) => p.row === currentSelected.row && p.col === currentSelected.col
+							);
+							if (movingPieceIndex === -1) return next;
+
+							// 2. Update position
+							next[movingPieceIndex] = {
+								...next[movingPieceIndex],
+								row: row,
+								col: col,
+							};
+
+							// 3. Handle Capture (Standard & En Passant)
+							if (move.flags.includes("e")) {
+								// En passant capture
+								// The captured pawn is at (fromRow, toCol) - wait, captured piece is at {row: fromRow, col: toCol}?
+								// No. En passant: P at e5 captures P at d5. Moves to d6.
+								// e5 (4, 4) -> d6 (2, 3).
+								// Captured piece is at d5 (3, 3).
+								// Captured row is `currentSelected.row` (moving piece row)? No, captured piece is adjacent.
+								// Actually better logic: find piece at `to` square first? No, en passant target is empty.
+								// Find piece at `to` column and `currentSelected.row`?
+								// Yes. Captured pawn is at `row: currentSelected.row`, `col: col`.
+								// Wait, `move.to` is (row, col).
+								// En passant target rule:
+								// If White P moves e5 -> d6.
+								// Captured P is at d5.
+								// `row` is d6 (index 2). `col` is d (index 3).
+								// Captured P is at `index 3` (d5).
+								// Row is `row + 1` (since white moves up, index decreases).
+								// If black P moves d4 -> e3. index 4 -> 5.
+								// Captured P is at e4. `row - 1`.
+								// Generic: capture square is `(currentSelected.row, col)`.
+								// Because the pawn moves diagonally to the column of the captured pawn.
+								// And checking piece at same rank as start.
+								// CONFIRMED: Captured piece is at `{ row: currentSelected.row, col: col }`.
+								const capturedRow = currentSelected.row;
+								const capturedCol = col;
+								const capturedIndex = next.findIndex(
+									(p) =>
+										p.row === capturedRow &&
+										p.col === capturedCol &&
+										p !== next[movingPieceIndex]
+								);
+								if (capturedIndex !== -1) next.splice(capturedIndex, 1);
+							} else {
+								// Standard capture
+								// Remove piece at destination
+								const capturedIndex = next.findIndex(
+									(p) => p.row === row && p.col === col && p !== next[movingPieceIndex]
+								);
+								if (capturedIndex !== -1) next.splice(capturedIndex, 1);
+							}
+
+							// 4. Handle Castling
+							if (move.flags.includes("k") || move.flags.includes("q")) {
+								const isKingside = move.flags.includes("k");
+								const rookRow = currentSelected.row; // Rook is on same rank as King's start
+								const rookFromCol = isKingside ? 7 : 0;
+								const rookToCol = isKingside ? 5 : 3;
+
+								const rookIndex = next.findIndex(
+									(p) => p.row === rookRow && p.col === rookFromCol
+								);
+								if (rookIndex !== -1) {
+									next[rookIndex] = { ...next[rookIndex], col: rookToCol };
+								}
+							}
+
+							// 5. Handle Promotion
+							if (move.flags.includes("p")) {
+								next[movingPieceIndex] = {
+									...next[movingPieceIndex],
+									type: move.promotion as PieceType,
+								};
+							}
+
+							return next;
+						});
+
 						return;
 					}
 				} catch (e) {
@@ -134,27 +250,19 @@ export default function ChessBoard({ orientation = "w" }: BoardProps) {
 			}
 
 			// If no move was made (or just starting), select this square if it has a piece
-			// We need to access the LATEST board, but board is State.
-			// Ideally we read from game.board() directly to ensure we have latest data?
-			// But board state is driven by game.board().
-			// Accessing state inside callback without dep check?
-			// We can use game.board() since game is a Ref!
 			const currentBoard = game.board();
 			const piece = currentBoard[row][col];
 			if (piece) {
 				setSelectedSquare({ row, col });
-				// Calculate valid moves only for this piece
 				const square = rowColToSquare(row, col, orientation);
 				const moves = game.moves({ square, verbose: true });
 				setPossibleMoves(moves);
 				setShowPieceSelector({ show: false, position: 0 });
 			} else {
-				// Clicked empty square but not a move -> Clear selection and moves
-				// (handled by 'if (currentSelected)' move attempt failing or not existing...
-				// actually if we click empty square with NO selection, we get here.
-				// We should clear if we clicked empty space?)
-				// No, the original logic just did nothing. We can keep it that way or explicit clear.
-				// Best to keep current behavior: if clicked empty space with nothing selected, do nothing.
+				setSelectedSquare(null);
+				setPossibleMoves([]);
+				setPossibleMoves([]);
+				setShowPieceSelector({ show: false, position: 0 });
 			}
 		},
 		[game, orientation]
@@ -184,6 +292,49 @@ export default function ChessBoard({ orientation = "w" }: BoardProps) {
 									setSelectedSquare(null);
 									setPossibleMoves([]);
 									setPendingMove(null);
+
+									setPieces((prev) => {
+										const next = [...prev];
+										const colMap: Record<string, number> = {
+											a: 0,
+											b: 1,
+											c: 2,
+											d: 3,
+											e: 4,
+											f: 5,
+											g: 6,
+											h: 7,
+										};
+
+										const fromColStr = pendingMove.from[0];
+										const fromRowStr = pendingMove.from[1];
+										const fromCol = colMap[fromColStr];
+										const fromRow = 8 - parseInt(fromRowStr);
+
+										const toColStr = pendingMove.to[0];
+										const toRowStr = pendingMove.to[1];
+										const toCol = colMap[toColStr];
+										const toRow = 8 - parseInt(toRowStr);
+
+										const movingPieceIndex = next.findIndex(
+											(p) => p.row === fromRow && p.col === fromCol
+										);
+										if (movingPieceIndex !== -1) {
+											next[movingPieceIndex] = {
+												...next[movingPieceIndex],
+												row: toRow,
+												col: toCol,
+												type: type, // Promote!
+											};
+
+											const capturedIndex = next.findIndex(
+												(p) =>
+													p.row === toRow && p.col === toCol && p !== next[movingPieceIndex]
+											);
+											if (capturedIndex !== -1) next.splice(capturedIndex, 1);
+										}
+										return next;
+									});
 								}
 								setShowPieceSelector({ show: false, position: 0 });
 							}}
@@ -210,6 +361,49 @@ export default function ChessBoard({ orientation = "w" }: BoardProps) {
 									setSelectedSquare(null);
 									setPossibleMoves([]);
 									setPendingMove(null);
+
+									setPieces((prev) => {
+										const next = [...prev];
+										const colMap: Record<string, number> = {
+											a: 0,
+											b: 1,
+											c: 2,
+											d: 3,
+											e: 4,
+											f: 5,
+											g: 6,
+											h: 7,
+										};
+
+										const fromColStr = pendingMove.from[0];
+										const fromRowStr = pendingMove.from[1];
+										const fromCol = colMap[fromColStr];
+										const fromRow = 8 - parseInt(fromRowStr);
+
+										const toColStr = pendingMove.to[0];
+										const toRowStr = pendingMove.to[1];
+										const toCol = colMap[toColStr];
+										const toRow = 8 - parseInt(toRowStr);
+
+										const movingPieceIndex = next.findIndex(
+											(p) => p.row === fromRow && p.col === fromCol
+										);
+										if (movingPieceIndex !== -1) {
+											next[movingPieceIndex] = {
+												...next[movingPieceIndex],
+												row: toRow,
+												col: toCol,
+												type: type, // Promote!
+											};
+
+											const capturedIndex = next.findIndex(
+												(p) =>
+													p.row === toRow && p.col === toCol && p !== next[movingPieceIndex]
+											);
+											if (capturedIndex !== -1) next.splice(capturedIndex, 1);
+										}
+										return next;
+									});
 								}
 								setShowPieceSelector({ show: false, position: 0 });
 							}}
@@ -236,26 +430,21 @@ export default function ChessBoard({ orientation = "w" }: BoardProps) {
 				)}
 
 				{/* Pieces */}
-				{board.map((row, rowIndex) => {
-					return row.map((piece, colIndex) => {
-						if (piece) {
-							return (
-								<Piece
-									key={`${rowIndex}-${colIndex}`}
-									type={piece.type}
-									color={
-										orientation === "w" ? piece.color : piece.color === "w" ? "b" : "w"
-									}
-									row={rowIndex}
-									col={colIndex}
-									position={rowColToSquare(rowIndex, colIndex, orientation)}
-									onPress={handleSquarePress}
-								/>
-							);
+				{pieces.map((piece) => (
+					<Piece
+						key={piece.id}
+						type={piece.type}
+						color={piece.color}
+						// Adjust visual row/col based on board orientation
+						row={orientation === "w" ? piece.row : 7 - piece.row}
+						col={orientation === "w" ? piece.col : 7 - piece.col}
+						onPress={handleSquarePress}
+						position={rowColToSquare(piece.row, piece.col, orientation)}
+						isSelected={
+							selectedSquare?.row === piece.row && selectedSquare?.col === piece.col
 						}
-						return null;
-					});
-				})}
+					/>
+				))}
 			</View>
 		</View>
 	);
