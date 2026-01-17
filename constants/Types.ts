@@ -1,5 +1,7 @@
 import { PieceType, PieceColor, SquareColor, Square } from "chess.js";
 
+export type PromotionPieceType = "q" | "r" | "b" | "n";
+
 export interface Friend {
 	id: string;
 	username: string;
@@ -35,7 +37,10 @@ export interface SquareProps {
 	row: number;
 	col: number;
 	index: number;
-	orientation: PieceColor;
+	isSelected?: boolean;
+	isHighlighted?: boolean;
+	isCapture?: boolean;
+	onPress?: (row: number, col: number) => void;
 }
 
 export interface PieceProps {
@@ -44,6 +49,12 @@ export interface PieceProps {
 	position: Square;
 	row: number;
 	col: number;
+	onPress?: (row: number, col: number) => void;
+}
+
+export interface PieceSelectorProps {
+	color: PieceColor;
+	onPress?: (type: PromotionPieceType) => void;
 }
 
 export interface BoardProps {

@@ -1,10 +1,15 @@
-import { View, StyleSheet, TouchableOpacity } from "react-native";
+import { TouchableOpacity } from "react-native";
 import { Image } from "expo-image";
-import React, { useState } from "react";
+import React, { useEffect } from "react";
 import { PieceProps } from "@/constants/Types";
 import { SQUARE_SIZE } from "./Square";
+import Animated, {
+	useAnimatedStyle,
+	useSharedValue,
+	withTiming,
+} from "react-native-reanimated";
 
-const PieceImageMap = {
+export const PieceImageMap = {
 	w: {
 		p: require("@/assets/pieces/pawn-w.svg"),
 		n: require("@/assets/pieces/knight-w.svg"),
@@ -23,45 +28,57 @@ const PieceImageMap = {
 	},
 };
 
-export default function Piece({ color, type, row, col }: PieceProps) {
-	const [pressed, setPressed] = useState(false);
-	const handlePress = () => {
-		setPressed((prev) => !prev);
-		setTimeout(() => {
-			setPressed((prev) => !prev);
-		}, 100);
-	};
+export default React.memo(function Piece({
+	color,
+	type,
+	row,
+	col,
+	onPress,
+}: PieceProps) {
+	const translateX = useSharedValue(col * SQUARE_SIZE);
+	const translateY = useSharedValue(row * SQUARE_SIZE);
+
+	useEffect(() => {
+		translateX.value = withTiming(col * SQUARE_SIZE, { duration: 300 });
+		translateY.value = withTiming(row * SQUARE_SIZE, { duration: 300 });
+	}, [col, row, translateX, translateY]);
+
+	const animatedStyle = useAnimatedStyle(() => {
+		return {
+			transform: [
+				{ translateX: translateX.value },
+				{ translateY: translateY.value },
+			],
+		};
+	});
 
 	return (
-		<TouchableOpacity
-			activeOpacity={0.8}
-			onPress={handlePress}
-			style={{
-				position: "absolute", 
-				width: SQUARE_SIZE,
-				height: SQUARE_SIZE,
-				left: col * SQUARE_SIZE,
-				top: row * SQUARE_SIZE,
-				justifyContent: "center",
-				alignItems: "center",
-				zIndex: 10,
-				transform: [{ scale: pressed ? 1.1 : 1 }],
-				// borderColor: "red",
-				// borderWidth: 1,
-			}}
+		<Animated.View
+			style={[
+				{
+					position: "absolute",
+					width: SQUARE_SIZE,
+					height: SQUARE_SIZE,
+					justifyContent: "center",
+					alignItems: "center",
+					zIndex: 10,
+					top: 0,
+					left: 0,
+				},
+				animatedStyle,
+			]}
 		>
-			<Image
-				style={styles.image}
-				source={PieceImageMap[color][type]}
-				contentFit="cover"
-			/>
-		</TouchableOpacity>
+			<TouchableOpacity
+				activeOpacity={0.8}
+				onPress={() => onPress?.(row, col)}
+				style={{ width: "100%", height: "100%" }}
+			>
+				<Image
+					style={{ flex: 1, width: "100%" }}
+					source={PieceImageMap[color][type]}
+					contentFit="cover"
+				/>
+			</TouchableOpacity>
+		</Animated.View>
 	);
-}
-
-const styles = StyleSheet.create({
-	image: {
-		flex: 1,
-		width: "100%",
-	},
 });
