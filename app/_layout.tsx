@@ -127,19 +127,20 @@ export const AppNavigator = () => {
 		};
 	}, []);
 
-	 if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center" }}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
+	if (loading) {
+		return (
+			<View style={{ flex: 1, justifyContent: "center" }}>
+				<ActivityIndicator size="large" />
+			</View>
+		);
+	}
 
 	return (
 		<Stack>
 			<Stack.Protected guard={!!session}>
 				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 				<Stack.Screen name="game" options={{ headerShown: false }} />
+				<Stack.Screen name="new-game" options={{ headerShown: false }} />
 				<Stack.Screen
 					name="join-game"
 					options={{

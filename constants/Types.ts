@@ -1,3 +1,5 @@
+import { PieceType, PieceColor, SquareColor, Square } from "chess.js";
+
 export interface Friend {
 	id: string;
 	username: string;
@@ -17,7 +19,7 @@ export interface Game {
 	winner_id: string | null;
 	expires_at: string;
 	invite_code: string;
-	turn: "w" | "b";
+	turn: PieceColor;
 }
 
 export interface GameInvite {
@@ -26,4 +28,24 @@ export interface GameInvite {
 	created_at: string;
 	expires_at: string;
 	status: "pending" | "waiting" | "active" | "completed";
+}
+
+export interface SquareProps {
+	color: SquareColor;
+	row: number;
+	col: number;
+	index: number;
+	orientation: PieceColor;
+}
+
+export interface PieceProps {
+	color: PieceColor;
+	type: PieceType;
+	position: Square;
+	row: number;
+	col: number;
+}
+
+export interface BoardProps {
+	orientation: PieceColor;
 }

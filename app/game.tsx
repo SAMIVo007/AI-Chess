@@ -11,7 +11,6 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
 import { ThemedView } from "@/components/ThemedView";
-import Chessboard, { ChessboardRef } from "react-native-chessboard";
 import { Chess, Square as SquareNotation } from "chess.js";
 import { startEngine, analyzePosition, stopEngine } from "@/utils/ai";
 import { speakMove } from "@/utils/voice";
