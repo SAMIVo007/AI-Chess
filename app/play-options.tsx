@@ -111,7 +111,7 @@ export default function PlayOptions() {
 					className="bg-green-600 rounded-xl py-4 mt-6"
 					onPress={() =>
 						router.push({
-							pathname: "/game",
+							pathname: "/new-game",
 							params: {
 								levelSelected: difficulty,
 								...(checked && { timeSelected: timeControl }), // Only include timeSelected if switch is checked
