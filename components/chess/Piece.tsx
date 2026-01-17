@@ -6,6 +6,8 @@ import { SQUARE_SIZE } from "./Square";
 import Animated, {
 	useAnimatedStyle,
 	useSharedValue,
+	withSequence,
+	withSpring,
 	withTiming,
 } from "react-native-reanimated";
 
@@ -34,20 +36,34 @@ export default React.memo(function Piece({
 	row,
 	col,
 	onPress,
+	isSelected,
 }: PieceProps) {
 	const translateX = useSharedValue(col * SQUARE_SIZE);
 	const translateY = useSharedValue(row * SQUARE_SIZE);
+	const scale = useSharedValue(1);
 
 	useEffect(() => {
-		translateX.value = withTiming(col * SQUARE_SIZE, { duration: 300 });
-		translateY.value = withTiming(row * SQUARE_SIZE, { duration: 300 });
+		translateX.value = withTiming(col * SQUARE_SIZE, { duration: 200 });
+		translateY.value = withTiming(row * SQUARE_SIZE, { duration: 200 });
 	}, [col, row, translateX, translateY]);
+
+	useEffect(() => {
+		if (isSelected) {
+			scale.value = withSequence(
+				withTiming(1.2, { duration: 150 }),
+				withTiming(1, { duration: 150 })
+			);
+		} else {
+			scale.value = withTiming(1, { duration: 150 });
+		}
+	}, [isSelected, scale]);
 
 	const animatedStyle = useAnimatedStyle(() => {
 		return {
 			transform: [
 				{ translateX: translateX.value },
 				{ translateY: translateY.value },
+				{ scale: scale.value },
 			],
 		};
 	});
@@ -69,7 +85,7 @@ export default React.memo(function Piece({
 			]}
 		>
 			<TouchableOpacity
-				activeOpacity={0.8}
+				activeOpacity={1}
 				onPress={() => onPress?.(row, col)}
 				style={{ width: "100%", height: "100%" }}
 			>
