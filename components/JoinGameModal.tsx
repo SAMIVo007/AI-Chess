@@ -67,7 +67,7 @@ export const JoinGameModal = ({
 				bottomSheetRef.current?.close();
 				// Move Guest to Game Screen
 				router.push({
-					pathname: "/game",
+					pathname: "/online-game",
 					params: { gameId: gameId },
 				});
 				setJoinCode("");

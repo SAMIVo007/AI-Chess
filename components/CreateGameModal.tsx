@@ -70,8 +70,8 @@ export const CreateGameModal = ({
 				// We wait a bit if share is dismissed to ensure smooth transition
 				setTimeout(() => {
 					router.push({
-						pathname: "/game",
-						params: { gameId: result.gameId, vsAI: "false" },
+						pathname: "/online-game",
+						params: { gameId: result.gameId },
 					});
 				}, 500);
 			}

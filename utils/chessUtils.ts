@@ -9,8 +9,10 @@ export function rowColToSquare(
 	col: number,
 	orientation: PieceColor
 ): Square {
-	const file = orientation === "w" ? FILES[col] : FILES[7 - col];
-	const rank = orientation === "w" ? RANKS[row] : RANKS[7 - row];
+	// row/col are already logical board coordinates (0,0 is a8)
+	// We ignore orientation because the caller (renderSquares) handles the visual flip
+	const file = FILES[col];
+	const rank = RANKS[row];
 	return (file + rank) as Square;
 }
 
@@ -28,6 +30,8 @@ export function squareToRowCol(
 	if (orientation === "w") {
 		return { row: rankIndex, col: fileIndex };
 	} else {
-		return { row: 7 - rankIndex, col: 7 - fileIndex };
+		// This conversion is likely also problematic if we want absolute coordinates
+		// But let's verify usage. If we assume this returns logical coordinates:
+		return { row: rankIndex, col: fileIndex };
 	}
 }

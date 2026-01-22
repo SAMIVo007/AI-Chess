@@ -10,8 +10,9 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import GameOverModal from "@/components/GameOverModal";
 import { ThemedView } from "@/components/ThemedView";
-import { Chess, Square as SquareNotation } from "chess.js";
+import { Chess, Move, Square as SquareNotation } from "chess.js";
 import { startEngine, analyzePosition, stopEngine } from "@/utils/ai";
 import { speakMove } from "@/utils/voice";
 import { PieceType } from "chess.js";
@@ -19,16 +20,11 @@ import { supabase } from "@/utils/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { isGameActive } from "@/api/supabaseAPI";
 import { ActivityIndicator } from "react-native";
+import ChessBoard, { ChessBoardRef } from "@/components/chess/ChessBoard";
 
 const { width } = Dimensions.get("window");
 
 const AVATAR_SIZE = 48;
-
-// 1) Grab the Chessboard’s props:
-type ChessboardProps = ComponentProps<typeof Chessboard>;
-
-// 2) Extract the `info` argument of the `onMove` callback:
-type ChessMoveInfo = Parameters<NonNullable<ChessboardProps["onMove"]>>[0];
 
 const getDescriptiveMove = (
 	game: InstanceType<typeof Chess>,
@@ -97,23 +93,13 @@ const getDescriptiveMove = (
 export default function GameScreen() {
 	const router = useRouter();
 	const { session } = useAuth();
-	const { levelSelected, timeSelected, vsAI, gameId } = useLocalSearchParams<{
+	const { levelSelected, timeSelected, gameId } = useLocalSearchParams<{
 		levelSelected: string;
 		timeSelected: string;
-		vsAI: "true" | "false";
 		gameId?: string;
 	}>();
 
-	console.log("Game params:", { levelSelected, timeSelected, vsAI, gameId });
-
-	const [game] = useState(() => new Chess());
-	const [fen, setFen] = useState(game.fen());
-
-	// SAN move history
-	const [history, setHistory] = useState<string[]>([]);
-
-	// Force-remount key for rematch
-	const [gameKey, setGameKey] = useState(0);
+	console.log("Game params:", { levelSelected, timeSelected, gameId });
 
 	// Game-over overlay state
 	const [gameOver, setGameOver] = useState<{
@@ -121,6 +107,7 @@ export default function GameScreen() {
 		resultText: string;
 		winner: "w" | "b" | null;
 	}>({ over: false, resultText: "", winner: null });
+	const [isModalVisible, setIsModalVisible] = useState(false);
 
 	// Online multiplayer state
 	const [isPlayerWhite, setIsPlayerWhite] = useState<boolean | null>(null);
@@ -149,8 +136,12 @@ export default function GameScreen() {
 	// Timer refs for cleanup
 	const timerRef = useRef<number | null>(null); // Keep as number for setInterval ID
 
-	const chessRef = useRef<ChessboardRef>(null);
+	const chessBoardRef = useRef<ChessBoardRef>(null);
 	const listRef = useRef<FlatList<string>>(null);
+
+	// Keep a local game instance PURELY for logic/history/validation checks
+	// (Optional, but good for calculating isMyTurn etc without querying child)
+	const [logicGame] = useState(new Chess());
 
 	// Keep voiceOnRef updated with current voiceOn value
 	useEffect(() => {
@@ -159,10 +150,10 @@ export default function GameScreen() {
 
 	// Initialize online game and set up real-time subscription
 	useEffect(() => {
-		if (vsAI === "false" && gameId) {
+		if (gameId) {
 			initializeOnlineGame();
 		}
-	}, [gameId, vsAI]);
+	}, [gameId]);
 
 	const fetchProfile = async (userId: string, isMe: boolean) => {
 		try {
@@ -206,20 +197,8 @@ export default function GameScreen() {
 			// Store status
 			setStatus(gameData.status);
 
-			// Determine if current user is white or black
-			// The creator is usually assigned a side.
-			// Check if we are checking waiting or active
-			let isWhite = false;
-			if (gameData.white_player_id === session.user.id) {
-				isWhite = true;
-			} else if (gameData.black_player_id === session.user.id) {
-				isWhite = false;
-			} else {
-				// If we are just viewing or it's a new joiner scenario (edge case if navigation happened before DB update?)
-				// Assuming standard flow: ID is already in DB.
-				// If waiting and I'm the creator...
-			}
-
+			// Identity
+			const isWhite = gameData.white_player_id === session.user.id;
 			setIsPlayerWhite(isWhite);
 
 			// Fetch opponent profile if they exist
@@ -234,13 +213,12 @@ export default function GameScreen() {
 
 			// Load game state if it exists
 			if (gameData.fen) {
-				game.load(gameData.fen);
-				setFen(gameData.fen);
-				setHistory(game.history());
+				logicGame.load(gameData.fen);
+				chessBoardRef.current?.reset(gameData.fen);
 			}
 
 			// Set turn
-			const currentTurn = game.turn();
+			const currentTurn = logicGame.turn();
 			// isMyTurn: (I am White AND Turn is White) OR (I am Black AND Turn is Black)
 			setIsMyTurn(
 				(isWhite && currentTurn === "w") || (!isWhite && currentTurn === "b")
@@ -252,7 +230,7 @@ export default function GameScreen() {
 				setGameStarted(true);
 			}
 
-			// Set up real-time subscription
+			// Realtime Subscription
 			const channel = supabase
 				.channel(`game-${gameId}`)
 				.on(
@@ -264,52 +242,42 @@ export default function GameScreen() {
 						filter: `id=eq.${gameId}`,
 					},
 					(payload) => {
-						console.log("Game state updated!", payload.new);
 						const newData = payload.new;
 
-						// 1. Handle Status Change (Waiting -> Active)
+						// 1. Status Update
 						if (newData.status === "active" && status !== "active") {
 							setStatus("active");
 							setGameStarted(true);
-							// Opponent joined!
-							// If I am white, opponent is black
-							if (isWhite && newData.black_player_id) {
-								fetchProfile(newData.black_player_id, false);
-							} else if (!isWhite && newData.white_player_id) {
-								fetchProfile(newData.white_player_id, false);
-							}
 						}
 
-						// 2. Handle Moves (FEN Updates)
-						const newFen = newData.fen;
-						if (newFen && newFen !== game.fen()) {
-							game.load(newFen);
-							setFen(newFen);
-							setHistory(game.history());
+						// 2. Handle Moves (Opponent)
+						if (newData.fen !== logicGame.fen()) {
+							// Determine the move that just happened
+							// We can't easily guess the 'from-to' just from FEN without complex diffing.
+							// OPTION A: Just reset the board (Animation snaps, but it works)
+							// chessBoardRef.current?.reset(newData.fen);
 
-							// Update board visual
-							if (chessRef.current) {
-								chessRef.current.resetBoard(newFen);
-							}
+							// OPTION B: Use PGN history if you are saving it correctly
+							// For now, let's use reset to ensure sync, then logicGame update
+							logicGame.load(newData.fen);
+							chessBoardRef.current?.reset(newData.fen); // Sync visual board
 
-							// Update turn
-							const currentTurn = game.turn();
-							setIsMyTurn(
-								(isWhite && currentTurn === "w") || (!isWhite && currentTurn === "b")
-							);
-							setActivePlayer(currentTurn as "w" | "b");
+							// Update Turn and Active Player
+							const turn = logicGame.turn(); // 'w' or 'b'
+							const myTurn = (isWhite && turn === "w") || (!isWhite && turn === "b");
+							setIsMyTurn(myTurn);
+							setActivePlayer(turn as "w" | "b");
 
-							// Check for game over
-							if (game.game_over()) {
-								let resultText = "";
-								if (game.in_checkmate()) {
-									const winner = game.turn() === "w" ? "b" : "w";
-									resultText = winner === "w" ? "White wins!" : "Black wins!";
-									setGameOver({ over: true, resultText, winner });
-								} else {
-									resultText = "It's a draw!";
-									setGameOver({ over: true, resultText, winner: null });
-								}
+							// Check Game Over
+							if (logicGame.game_over()) {
+								const winner = logicGame.in_checkmate()
+									? logicGame.turn() === "w"
+										? "b"
+										: "w"
+									: null;
+								const resultText = logicGame.in_checkmate() ? "Checkmate!" : "Draw";
+								setGameOver({ over: true, resultText, winner });
+								setIsModalVisible(true);
 							}
 						}
 					}
@@ -387,124 +355,69 @@ export default function GameScreen() {
 		}
 	}, [levelSelected, timeSelected, gameStarted]); // Updated dependencies
 
-	const onUserMove = async (info: ChessMoveInfo) => {
-		const { from, to, promotion } = info.move;
+	const onMyMove = async (move: Move) => {
+		// This callback fires ONLY when WE make a move on the board
+		// 1. Update Logic Game
+		logicGame.move(move); // Sync local logic
+		setIsMyTurn(false); // Immediate lock
 
-		// For online games, check if it's the player's turn
-		if (vsAI === "false" && !isMyTurn) {
-			console.log("Not your turn!");
-			return;
-		}
+		// 2. Send to Supabase
+		if (gameId) {
+			await supabase
+				.from("games")
+				.update({
+					fen: logicGame.fen(),
+					pgn: logicGame.pgn(),
+					turn: logicGame.turn(),
+					status: logicGame.game_over() ? "completed" : "active",
+				})
+				.eq("id", gameId);
 
-		// Start the game timer on first move
-		if (!gameStarted) {
-			setGameStarted(true);
-		}
-
-		// Update the game instance with the move
-		const moveResult = game.move({
-			from: from,
-			to: to,
-			promotion: promotion || undefined,
-		});
-
-		if (!moveResult) {
-			console.log("Invalid move");
-			return;
-		}
-
-		// Update the FEN state
-		setFen(game.fen());
-
-		// Update history
-		setHistory(game.history());
-
-		const { fen, game_over, in_check, in_checkmate, in_draw, in_stalemate } =
-			info.state;
-
-		const activeColor = fen.split(" ")[1]; // "b" or "w"
-		console.log("Active color:", activeColor);
-
-		// Switch active player for timer
-		setActivePlayer(activeColor as "w" | "b");
-
-		// Handle different game modes
-		if (vsAI === "true") {
-			// AI Game Logic
-			if (!game_over && activeColor === "b") {
-				const difficultyLevel = levelSelected ? parseInt(levelSelected, 10) : 1;
-				console.log("Requesting AI move with difficulty:", difficultyLevel);
-				analyzePosition(info.state.fen, difficultyLevel).catch((error) => {
-					console.error("Error requesting AI move:", error);
-				});
+			if (logicGame.game_over()) {
+				const winner = logicGame.in_checkmate()
+					? logicGame.turn() === "w"
+						? "b"
+						: "w"
+					: null;
+				const resultText = logicGame.in_checkmate() ? "Checkmate!" : "Draw";
+				setGameOver({ over: true, resultText, winner });
+				setIsModalVisible(true);
 			}
-		} else if (vsAI === "false" && gameId) {
-			// Online Multiplayer Logic
-			try {
-				const { error } = await supabase
-					.from("games")
-					.update({
-						fen: game.fen(),
-						pgn: game.pgn(),
-						status: game_over ? "completed" : "active",
-						turn: game.turn(),
-					})
-					.eq("id", gameId);
-
-				if (error) {
-					console.error("Error updating game:", error);
-				} else {
-					// Update turn state
-					setIsMyTurn(false);
-				}
-			} catch (error) {
-				console.error("Error making online move:", error);
-			}
-		}
-
-		// Game over logic (same for both modes)
-		if (game_over) {
-			let resultText = "";
-			if (in_checkmate) {
-				resultText = activeColor === "w" ? "Black wins!" : "White wins!";
-			} else if (in_stalemate || in_draw) {
-				resultText = "It's a draw!";
-			}
-			setGameOver({ over: true, resultText, winner: activeColor as "w" | "b" });
 		}
 	};
 
-	const handleUndo = () => {
-		// Undo the last move in the chess.js instance
-		game.undo(); // User's move
-		// If it was AI's turn before user's undo, undo AI's move as well
-		if (
-			game.history().length > 0 &&
-			game.turn() === "b" &&
-			activePlayer === "w"
-		) {
-			game.undo(); // AI's move
-		}
+	// const handleUndo = () => {
+	// 	// Undo the last move in the chess.js instance
+	// 	game.undo(); // User's move
+	// 	// If it was AI's turn before user's undo, undo AI's move as well
+	// 	if (
+	// 		game.history().length > 0 &&
+	// 		game.turn() === "b" &&
+	// 		activePlayer === "w"
+	// 	) {
+	// 		game.undo(); // AI's move
+	// 	}
 
-		// Update the FEN state to reflect the new board position
-		setFen(game.fen());
+	// 	// Update the FEN state to reflect the new board position
+	// 	setFen(game.fen());
 
-		// Update the history
-		setHistory(game.history());
+	// 	// Update the history
+	// 	setHistory(game.history());
 
-		// Update the board display
-		if (chessRef.current) {
-			chessRef.current.resetBoard(game.fen());
-		}
-		// After undo, it's current turn's player
-		setActivePlayer(game.turn() as "w" | "b");
-		// If history is empty, game hasn't started
-		if (game.history().length === 0) {
-			setGameStarted(false);
-		}
-	};
+	// 	// Update the board display
+	// 	if (chessRef.current) {
+	// 		chessRef.current.resetBoard(game.fen());
+	// 	}
+	// 	// After undo, it's current turn's player
+	// 	setActivePlayer(game.turn() as "w" | "b");
+	// 	// If history is empty, game hasn't started
+	// 	if (game.history().length === 0) {
+	// 		setGameStarted(false);
+	// 	}
+	// };
 
 	// Format mm:ss
+
 	const formatTime = (t: number) =>
 		`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(
 			2,
@@ -521,131 +434,62 @@ export default function GameScreen() {
 	};
 
 	// Rematch → clear history, reset overlay & clocks, bump gameKey
-	const rematch = async () => {
-		// Reset game instance
-		game.reset();
-		setFen(game.fen());
-		setHistory([]);
+	// const rematch = async () => {
+	// 	// Reset game instance
+	// 	game.reset();
+	// 	setFen(game.fen());
+	// 	setHistory([]);
 
-		// Reset game state
-		setGameOver({ over: false, resultText: "", winner: null });
-		setGameKey((k) => k + 1);
-		setGameStarted(false);
-		setActivePlayer("w");
+	// 	// Reset game state
+	// 	setGameOver({ over: false, resultText: "", winner: null });
+	// 	setGameKey((k) => k + 1);
+	// 	setGameStarted(false);
+	// 	setActivePlayer("w");
 
-		// Reset time based on initial params if available, otherwise default
-		const initialTime = timeSelected ? parseInt(timeSelected, 10) : 300;
-		setWhiteTime(initialTime);
-		setBlackTime(initialTime);
+	// 	// Reset time based on initial params if available, otherwise default
+	// 	const initialTime = timeSelected ? parseInt(timeSelected, 10) : 300;
+	// 	setWhiteTime(initialTime);
+	// 	setBlackTime(initialTime);
 
-		// Clear any existing timer
-		if (timerRef.current) {
-			clearInterval(timerRef.current);
-			timerRef.current = null;
-		}
+	// 	// Clear any existing timer
+	// 	if (timerRef.current) {
+	// 		clearInterval(timerRef.current);
+	// 		timerRef.current = null;
+	// 	}
 
-		// Reset the visual board
-		chessRef.current?.resetBoard(game.fen());
+	// 	// Reset the visual board
+	// 	chessRef.current?.resetBoard(game.fen());
 
-		// For online games, update the database
-		if (vsAI === "false" && gameId) {
-			try {
-				const { error } = await supabase
-					.from("games")
-					.update({
-						fen: game.fen(),
-						pgn: game.pgn(),
-						status: "active",
-						turn: "w",
-					})
-					.eq("id", gameId);
+	// 	// For online games, update the database
+	// 	if (vsAI === "false" && gameId) {
+	// 		try {
+	// 			const { error } = await supabase
+	// 				.from("games")
+	// 				.update({
+	// 					fen: game.fen(),
+	// 					pgn: game.pgn(),
+	// 					status: "active",
+	// 					turn: "w",
+	// 				})
+	// 				.eq("id", gameId);
 
-				if (error) {
-					console.error("Error resetting online game:", error);
-				} else {
-					// Reset turn state
-					setIsMyTurn(isPlayerWhite === true);
-				}
-			} catch (error) {
-				console.error("Error resetting game:", error);
-			}
-		}
-	};
+	// 			if (error) {
+	// 				console.error("Error resetting online game:", error);
+	// 			} else {
+	// 				// Reset turn state
+	// 				setIsMyTurn(isPlayerWhite === true);
+	// 			}
+	// 		} catch (error) {
+	// 			console.error("Error resetting game:", error);
+	// 		}
+	// 	}
+	// };
 
-	// stockfish initialization
-	useEffect(() => {
-		const initializeGame = async () => {
-			const onLine = async (line: string) => {
-				console.log("Stockfish →", line);
-				if (line.startsWith("bestmove")) {
-					const uci = line.split(" ")[1];
-					console.log("Received bestmove:", uci);
-
-					if (uci && chessRef.current) {
-						// First parse the move
-						const from = uci.slice(0, 2) as SquareNotation;
-						const to = uci.slice(2, 4) as SquareNotation;
-						const promotionChar = uci.length > 4 ? uci.charAt(4) : undefined;
-						const promotion =
-							promotionChar && ["n", "b", "r", "q"].includes(promotionChar)
-								? (promotionChar as "n" | "b" | "r" | "q")
-								: undefined;
-
-						// Get move description BEFORE making the move
-						const moveDescription = getDescriptiveMove(game, uci);
-						console.log("AI Move Description:", moveDescription);
-
-						// Then animate and apply the move
-						await chessRef.current.move({ from, to });
-
-						// Also update the game state
-						game.move({ from, to, promotion });
-
-						// Update state and switch active player
-						setFen(game.fen());
-						setHistory(game.history()); // Ensure history is updated
-						setActivePlayer("w"); // After AI (black) moves, it's white's turn
-
-						// Voice feedback
-						if (voiceOnRef.current) {
-							speakMove(moveDescription);
-						}
-					}
-				}
-			};
-
-			console.log("Initializing game with Stockfish...");
-
-			// start the engine + listener
-			try {
-				await startEngine(onLine);
-				console.log("Stockfish initialization completed");
-			} catch (error) {
-				console.error("Failed to initialize Stockfish:", error);
-			}
-		};
-
-		if (vsAI === "true") {
-			initializeGame();
-		}
-
-		return () => {
-			if (vsAI === "true") {
-				console.log("Game component cleanup - stopping engine");
-				stopEngine();
-			}
-
-			if (timerRef.current) {
-				clearInterval(timerRef.current);
-			}
-		};
-	}, []);
-
-	useEffect(() => {
-		if (history.length > 0) {
-			listRef.current?.scrollToEnd({ animated: true });
-		}
-	}, [history]);
+	// useEffect(() => {
+	// 	if (history.length > 0) {
+	// 		listRef.current?.scrollToEnd({ animated: true });
+	// 	}
+	// }, [history]);
 
 	return (
 		<ThemedView className="flex-1 bg-gray-50 dark:bg-black">
@@ -669,22 +513,14 @@ export default function GameScreen() {
 					<Image
 						source={{
 							uri:
-								(isPlayerWhite
-									? vsAI === "true"
-										? null
-										: myAvatar
-									: opponentAvatar) ||
+								(isPlayerWhite ? opponentAvatar : myAvatar) ||
 								"https://www.shutterstock.com/image-vector/young-smiling-man-avatar-brown-600nw-2261401207.jpg",
 						}}
 						className="rounded-full"
 						style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
 					/>
 					<Text className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">
-						{vsAI === "true"
-							? "You"
-							: isPlayerWhite
-							? session?.user.aud
-							: opponentName}
+						{isPlayerWhite ? session?.user.aud : opponentName}
 					</Text>
 					<View
 						className={`mt-1 px-3 py-1 rounded-full shadow ${
@@ -710,18 +546,14 @@ export default function GameScreen() {
 					<Image
 						source={{
 							uri:
-								(isPlayerWhite ? opponentAvatar : vsAI === "true" ? null : myAvatar) ||
+								(isPlayerWhite ? myAvatar : opponentAvatar) ||
 								"https://www.shutterstock.com/image-vector/young-smiling-man-avatar-3d-600nw-2124054758.jpg",
 						}}
 						className="rounded-full"
 						style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
 					/>
 					<Text className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">
-						{vsAI === "true"
-							? "AI"
-							: isPlayerWhite
-							? opponentName
-							: session?.user.aud}
+						{isPlayerWhite ? opponentName : session?.user.aud}
 					</Text>
 					<View
 						className={`mt-1 px-3 py-1 rounded-full shadow ${
@@ -743,37 +575,28 @@ export default function GameScreen() {
 				</View>
 			</View>
 
-			{/* Chess Board */}
+			{/* Board Area */}
 			<View className="flex-1 items-center justify-center">
-				<Chessboard
-					ref={chessRef}
-					// fen={fen}
-					boardSize={width}
-					gestureEnabled={vsAI === "true" ? true : isMyTurn}
-					onMove={onUserMove}
-					durations={{ move: 150 }}
-					colors={{
-						white: "#f0d9b5",
-						black: "#b4855e",
-					}}
+				<ChessBoard
+					ref={chessBoardRef}
+					orientation={isPlayerWhite ? "w" : "b"}
+					onMove={onMyMove}
 				/>
 			</View>
 
 			{/* Turn Indicator for Online Games */}
-			{vsAI === "false" && (
-				<View className="py-2 px-4">
-					<Text
-						className={`text-center text-lg font-semibold ${
-							isMyTurn ? "text-green-600" : "text-orange-600"
-						}`}
-					>
-						{isMyTurn ? "Your Turn" : "Opponent's Turn"}
-					</Text>
-				</View>
-			)}
+			<View className="py-2 px-4">
+				<Text
+					className={`text-center text-lg font-semibold ${
+						isMyTurn ? "text-green-600" : "text-orange-600"
+					}`}
+				>
+					{isMyTurn ? "Your Turn" : "Opponent's Turn"}
+				</Text>
+			</View>
 
 			{/* Move List */}
-			<View className="py-2 h-[4.6rem] border-t border-gray-200 dark:border-gray-700">
+			{/* <View className="py-2 h-[4.6rem] border-t border-gray-200 dark:border-gray-700">
 				<Text className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 pl-4">
 					Moves
 				</Text>
@@ -808,57 +631,31 @@ export default function GameScreen() {
 							({ length: 100, offset: 100 * index, index }) // Replace 100 with actual item width + margin
 					}
 				/>
-			</View>
+			</View> */}
 
 			{/* Bottom Controls */}
 			<View className="flex-row justify-around items-center py-3 border-t border-gray-200 dark:border-gray-700">
-				{vsAI === "true" && (
-					<>
-						<TouchableOpacity onPress={() => setVoiceOn((v) => !v)} className="p-2">
-							<FontAwesome5
-								name={voiceOn ? "volume-up" : "volume-mute"}
-								size={24}
-								color={voiceOn ? "#4caf50" : "#999"}
-							/>
-						</TouchableOpacity>
-
-						<TouchableOpacity className="p-2" onPress={handleUndo}>
-							<MaterialIcons name="undo" size={28} color="lightgray" />
-						</TouchableOpacity>
-					</>
-				)}
-
 				<TouchableOpacity className="p-2">
 					<MaterialIcons name="flag" size={28} color="#e53935" />
 				</TouchableOpacity>
 			</View>
 
 			{/* Game Over Overlay */}
-			{gameOver.over && (
-				<View className="absolute inset-0 bg-black/70 items-center justify-center p-4 z-10">
-					<View className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-sm">
-						<Text className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100 mb-4">
-							{gameOver.resultText}
-						</Text>
-						<TouchableOpacity
-							onPress={rematch}
-							className="bg-blue-600 rounded-md py-3 mb-3"
-						>
-							<Text className="text-center text-white font-semibold">Rematch</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							onPress={() => router.push("/(tabs)")}
-							className="border border-gray-300 rounded-md py-3"
-						>
-							<Text className="text-center text-gray-700 dark:text-gray-200">
-								New Game
-							</Text>
-						</TouchableOpacity>
-					</View>
-				</View>
-			)}
+			<GameOverModal
+				isOpen={isModalVisible}
+				isWinner={
+					isPlayerWhite !== null && gameOver.winner === (isPlayerWhite ? "w" : "b")
+				}
+				onRematch={() => {
+					// Implement rematch logic if needed
+					// For now, reload or create new logic
+					router.replace("/(tabs)");
+				}}
+				onNewGame={() => router.replace("/play-options")}
+				onClose={() => setIsModalVisible(false)}
+			/>
 
-			{vsAI === "false" && status === "waiting" && (
+			{status === "waiting" && (
 				<View className="absolute inset-0 bg-black/80 items-center justify-center p-4 z-20">
 					<Text className="text-white text-xl font-bold mb-4">
 						Waiting for opponent...

@@ -22,6 +22,7 @@ export default function PlayOptions() {
 	const [difficulty, setDifficulty] = useState(1); // 0-20
 	const [timeControl, setTimeControl] = useState(300); // seconds
 	const [checked, setChecked] = useState(false); // toggle for time control
+	const [playerColor, setPlayerColor] = useState<"w" | "b">("w"); // default White
 	const timeOptions = [60, 180, 300, 600, 900];
 
 	return (
@@ -95,6 +96,52 @@ export default function PlayOptions() {
 					</View>
 				</View>
 
+				{/* Player Color Selection */}
+				<View className="mb-8">
+					<ThemedText className="mb-2 text-lg font-medium">Play As</ThemedText>
+					<View className="flex-row gap-4">
+						<TouchableOpacity
+							onPress={() => setPlayerColor("w")}
+							className={`flex-1 flex-row items-center justify-center py-3 rounded-xl border-2 ${
+								playerColor === "w"
+									? "bg-gray-100 border-green-600 dark:bg-gray-800"
+									: "bg-white border-gray-200 dark:bg-gray-900 dark:border-gray-700"
+							}`}
+						>
+							<View className="w-6 h-6 rounded-full bg-white border border-gray-300 mr-2" />
+							<Text
+								className={`font-semibold ${
+									playerColor === "w"
+										? "text-green-600"
+										: "text-gray-900 dark:text-gray-100"
+								}`}
+							>
+								White
+							</Text>
+						</TouchableOpacity>
+
+						<TouchableOpacity
+							onPress={() => setPlayerColor("b")}
+							className={`flex-1 flex-row items-center justify-center py-3 rounded-xl border-2 ${
+								playerColor === "b"
+									? "bg-gray-100 border-green-600 dark:bg-gray-800"
+									: "bg-white border-gray-200 dark:bg-gray-900 dark:border-gray-700"
+							}`}
+						>
+							<View className="w-6 h-6 rounded-full bg-black border border-gray-600 mr-2" />
+							<Text
+								className={`font-semibold ${
+									playerColor === "b"
+										? "text-green-600"
+										: "text-gray-900 dark:text-gray-100"
+								}`}
+							>
+								Black
+							</Text>
+						</TouchableOpacity>
+					</View>
+				</View>
+
 				{/* Future Features Placeholder */}
 				<View className="mb-8">
 					<ThemedText className="mb-2 text-lg font-medium">
@@ -111,11 +158,11 @@ export default function PlayOptions() {
 					className="bg-green-600 rounded-xl py-4 mt-6"
 					onPress={() =>
 						router.push({
-							pathname: "/new-game",
+							pathname: "/offline-game",
 							params: {
 								levelSelected: difficulty,
+								playerColor: playerColor,
 								...(checked && { timeSelected: timeControl }), // Only include timeSelected if switch is checked
-								vsAI: "true", // Always true for AI game
 							},
 						})
 					}

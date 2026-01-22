@@ -139,8 +139,8 @@ export const AppNavigator = () => {
 		<Stack>
 			<Stack.Protected guard={!!session}>
 				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-				<Stack.Screen name="game" options={{ headerShown: false }} />
-				<Stack.Screen name="new-game" options={{ headerShown: false }} />
+				<Stack.Screen name="offline-game" options={{ headerShown: false }} />
+				<Stack.Screen name="online-game" options={{ headerShown: false }} />
 				<Stack.Screen
 					name="join-game"
 					options={{
