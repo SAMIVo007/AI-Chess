@@ -50,9 +50,9 @@ export default function HomeScreen() {
 			<View className="flex-row flex-wrap justify-center px-4 pb-6">
 				{[
 					{ icon: "cpu", label: "Play vs AI", route: "/play-options" as const },
-					{ icon: "globe", label: "Play Online", route: null },
+					// { icon: "globe", label: "Play Online", route: "/online-game" as const },
 					{ icon: "users", label: "Play with Friends", route: "/challenge-friends" as const },
-					{ icon: "bar-chart-2", label: "Stats", route: null },
+					// { icon: "bar-chart-2", label: "Stats", route: null },
 				].map(({ icon, label, route }) => (
 					<TouchableOpacity
 						key={label}

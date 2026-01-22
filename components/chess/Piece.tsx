@@ -33,8 +33,8 @@ export const PieceImageMap = {
 export default React.memo(function Piece({
 	color,
 	type,
-	row,
-	col,
+	row, // Visual Row
+	col, // Visual Col
 	onPress,
 	isSelected,
 }: PieceProps) {

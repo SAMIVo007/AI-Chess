@@ -1,4 +1,4 @@
-import { PieceType, PieceColor, SquareColor, Square } from "chess.js";
+import { PieceType, PieceColor, SquareColor, Square, Move } from "chess.js";
 
 export type PromotionPieceType = "q" | "r" | "b" | "n";
 
@@ -60,4 +60,5 @@ export interface PieceSelectorProps {
 
 export interface BoardProps {
 	orientation: PieceColor;
+	onMove?: (move: Move) => void;
 }

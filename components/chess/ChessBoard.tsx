@@ -1,5 +1,12 @@
 import { View, Dimensions } from "react-native";
-import React, { useRef, useState, useCallback, useEffect } from "react";
+import React, {
+	useRef,
+	useState,
+	useCallback,
+	useEffect,
+	useImperativeHandle,
+	forwardRef,
+} from "react";
 import Square, { SQUARE_SIZE } from "./Square";
 import Piece from "./Piece";
 import { BoardProps, PieceProps, PromotionPieceType } from "@/constants/Types";
@@ -14,6 +21,17 @@ import { rowColToSquare } from "@/utils/chessUtils";
 import PieceSelector from "./PieceSelector";
 
 const { width } = Dimensions.get("window");
+
+// Define what methods the parent can call on this board
+export interface ChessBoardRef {
+	move: (
+		from: SquareType,
+		to: SquareType,
+		promotion?: PromotionPieceType
+	) => void;
+	reset: (fen?: string) => void;
+	undo: () => void;
+}
 
 interface AnimatedPiece {
 	id: string;
@@ -76,376 +94,295 @@ const renderSquares = (
 	});
 };
 
-export default function ChessBoard({ orientation = "w" }: BoardProps) {
-	// 1. Initialize the game engine
-	const gameRef = useRef(new Chess());
-	const game = gameRef.current; // Stable reference that persists
+const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
+	({ orientation = "w", onMove }, ref) => {
+		// 1. Initialize the game engine
+		const gameRef = useRef(new Chess());
+		const game = gameRef.current; // Stable reference that persists
 
-	// 2. The Board State: This 8x8 array is the ONLY state needed.
-	// It contains objects like { type: 'p', color: 'b' } or null.
-	const [board, setBoard] = useState(game.board());
-	const [pieces, setPieces] = useState<AnimatedPiece[]>(() =>
-		getInitialPieces(game.board())
-	);
+		// 2. The Board State: This 8x8 array is the ONLY state needed.
+		// It contains objects like { type: 'p', color: 'b' } or null.
+		const [board, setBoard] = useState(game.board());
+		const [pieces, setPieces] = useState<AnimatedPiece[]>(() =>
+			getInitialPieces(game.board())
+		);
 
-	// 3. Selection State (for moving)
-	const [selectedSquare, setSelectedSquare] = useState<{
-		row: number;
-		col: number;
-	} | null>(null);
+		// 3. Selection State (for moving)
+		const [selectedSquare, setSelectedSquare] = useState<{
+			row: number;
+			col: number;
+		} | null>(null);
 
-	// 4. Possible Moves State
-	const [possibleMoves, setPossibleMoves] = useState<Move[]>([]);
+		// 4. Possible Moves State
+		const [possibleMoves, setPossibleMoves] = useState<Move[]>([]);
 
-	// 5. Promotion State
+		// 5. Promotion State
 
-	const [showPieceSelector, setShowPieceSelector] = useState({
-		show: false,
-		position: 0,
-	});
+		const [showPieceSelector, setShowPieceSelector] = useState({
+			show: false,
+			position: 0,
+		});
 
-	const [pendingMove, setPendingMove] = useState<{
-		from: SquareType;
-		to: SquareType;
-	} | null>(null);
+		const [pendingMove, setPendingMove] = useState<{
+			from: SquareType;
+			to: SquareType;
+		} | null>(null);
 
-	// Ref to access state inside useCallback without re-creating it
-	const selectedSquareRef = useRef(selectedSquare);
-	useEffect(() => {
-		selectedSquareRef.current = selectedSquare;
-	}, [selectedSquare]);
+		// Ref to access state inside useCallback without re-creating it
+		const selectedSquareRef = useRef(selectedSquare);
+		useEffect(() => {
+			selectedSquareRef.current = selectedSquare;
+		}, [selectedSquare]);
 
-	const handleSquarePress = useCallback(
-		(row: number, col: number) => {
-			const currentSelected = selectedSquareRef.current;
-
-			// If we select the same square, deselect
-			if (currentSelected?.row === row && currentSelected?.col === col) {
-				setSelectedSquare(null);
-				setPossibleMoves([]);
-				setShowPieceSelector({ show: false, position: 0 });
-				return;
-			}
-
-			// If we have a selection, try to move there
-			if (currentSelected) {
-				const from = rowColToSquare(
-					currentSelected.row,
-					currentSelected.col,
-					orientation
-				);
-				const to = rowColToSquare(row, col, orientation);
-
-				// Check for promotion FIRST
-				const moves = game.moves({ verbose: true });
-				const isPromotion = moves.find(
-					(m) => m.from === from && m.to === to && m.flags.includes("p")
-				);
-
-				if (isPromotion) {
-					setPendingMove({ from: from as SquareType, to: to as SquareType });
-					setShowPieceSelector({ show: true, position: col });
-					return;
-				}
-
+		// --- LOGIC: INTERNAL MOVE HANDLER (Reusable) ---
+		const executeMove = useCallback(
+			(from: SquareType, to: SquareType, promotion?: PromotionPieceType) => {
 				try {
-					// Try to move in the engine
-					const move = game.move({ from, to });
-
+					const move = game.move({ from, to, promotion });
 					if (move) {
-						// IF VALID: Update the visual board to match the engine
+						// 1. Logic Updates
 						setBoard(game.board());
 						setSelectedSquare(null);
 						setPossibleMoves([]);
+						setPendingMove(null); // Clear any pending promotion
 
-						// Update Pieces State for Animation
+						// 2. Animation Updates (The complex reducer logic)
 						setPieces((prev) => {
 							const next = [...prev];
-							// 1. Find the moving piece
-							const movingPieceIndex = next.findIndex(
-								(p) => p.row === currentSelected.row && p.col === currentSelected.col
-							);
-							if (movingPieceIndex === -1) return next;
 
-							// 2. Update position
-							next[movingPieceIndex] = {
-								...next[movingPieceIndex],
-								row: row,
-								col: col,
+							// Helper to parse 'e4' to {row, col} depending on NO orientation (logic uses standard indices)
+							// Wait, your animation logic relied on Visual Row/Col or Logical Row/Col?
+							// Your state logic uses standard array indices (0-7), independent of orientation. Good.
+
+							// We need to find coordinates for 'from' and 'to' strings
+							const parseSquare = (sq: string) => {
+								const colFile = sq[0]; // 'e'
+								const rowRank = sq[1]; // '4'
+								const colIndex = "abcdefgh".indexOf(colFile);
+								const rowIndex = 8 - parseInt(rowRank);
+								return { row: rowIndex, col: colIndex };
 							};
 
-							// 3. Handle Capture (Standard & En Passant)
+							const start = parseSquare(move.from);
+							const end = parseSquare(move.to);
+
+							const movingPieceIndex = next.findIndex(
+								(p) => p.row === start.row && p.col === start.col
+							);
+							if (movingPieceIndex === -1) return next; // Should not happen
+
+							// Update Position
+							next[movingPieceIndex] = {
+								...next[movingPieceIndex],
+								row: end.row,
+								col: end.col,
+								type: move.promotion
+									? (move.promotion as PieceType)
+									: next[movingPieceIndex].type,
+							};
+
+							// Handle Captures
 							if (move.flags.includes("e")) {
-								// En passant capture
-								// The captured pawn is at (fromRow, toCol) - wait, captured piece is at {row: fromRow, col: toCol}?
-								// No. En passant: P at e5 captures P at d5. Moves to d6.
-								// e5 (4, 4) -> d6 (2, 3).
-								// Captured piece is at d5 (3, 3).
-								// Captured row is `currentSelected.row` (moving piece row)? No, captured piece is adjacent.
-								// Actually better logic: find piece at `to` square first? No, en passant target is empty.
-								// Find piece at `to` column and `currentSelected.row`?
-								// Yes. Captured pawn is at `row: currentSelected.row`, `col: col`.
-								// Wait, `move.to` is (row, col).
-								// En passant target rule:
-								// If White P moves e5 -> d6.
-								// Captured P is at d5.
-								// `row` is d6 (index 2). `col` is d (index 3).
-								// Captured P is at `index 3` (d5).
-								// Row is `row + 1` (since white moves up, index decreases).
-								// If black P moves d4 -> e3. index 4 -> 5.
-								// Captured P is at e4. `row - 1`.
-								// Generic: capture square is `(currentSelected.row, col)`.
-								// Because the pawn moves diagonally to the column of the captured pawn.
-								// And checking piece at same rank as start.
-								// CONFIRMED: Captured piece is at `{ row: currentSelected.row, col: col }`.
-								const capturedRow = currentSelected.row;
-								const capturedCol = col;
+								// En Passant: capture is at {row: start.row, col: end.col}
+								const capturedIndex = next.findIndex(
+									(p) => p.row === start.row && p.col === end.col
+								);
+								if (capturedIndex !== -1) next.splice(capturedIndex, 1);
+							} else if (move.captured) {
+								// Standard capture at destination
 								const capturedIndex = next.findIndex(
 									(p) =>
-										p.row === capturedRow &&
-										p.col === capturedCol &&
-										p !== next[movingPieceIndex]
-								);
-								if (capturedIndex !== -1) next.splice(capturedIndex, 1);
-							} else {
-								// Standard capture
-								// Remove piece at destination
-								const capturedIndex = next.findIndex(
-									(p) => p.row === row && p.col === col && p !== next[movingPieceIndex]
+										p.row === end.row && p.col === end.col && p !== next[movingPieceIndex]
 								);
 								if (capturedIndex !== -1) next.splice(capturedIndex, 1);
 							}
 
-							// 4. Handle Castling
-							if (move.flags.includes("k") || move.flags.includes("q")) {
-								const isKingside = move.flags.includes("k");
-								const rookRow = currentSelected.row; // Rook is on same rank as King's start
-								const rookFromCol = isKingside ? 7 : 0;
-								const rookToCol = isKingside ? 5 : 3;
+							// Handle Castling
+							if (move.san === "O-O" || move.san === "O-O-O") {
+								// Logic for rook movement
+								const isKingside = move.san === "O-O";
+								const rookStartCol = isKingside ? 7 : 0;
+								const rookEndCol = isKingside ? 5 : 3;
+								const row = start.row; // 0 for black, 7 for white
 
 								const rookIndex = next.findIndex(
-									(p) => p.row === rookRow && p.col === rookFromCol
+									(p) => p.row === row && p.col === rookStartCol
 								);
 								if (rookIndex !== -1) {
-									next[rookIndex] = { ...next[rookIndex], col: rookToCol };
+									next[rookIndex] = { ...next[rookIndex], col: rookEndCol };
 								}
-							}
-
-							// 5. Handle Promotion
-							if (move.flags.includes("p")) {
-								next[movingPieceIndex] = {
-									...next[movingPieceIndex],
-									type: move.promotion as PieceType,
-								};
 							}
 
 							return next;
 						});
 
-						return;
+						return move;
 					}
 				} catch (e) {
-					// Invalid move
+					console.log("Move failed internally", e);
 				}
-			}
+				return null;
+			},
+			[game]
+		);
 
-			// If no move was made (or just starting), select this square if it has a piece
-			const currentBoard = game.board();
-			const piece = currentBoard[row][col];
-			if (piece) {
-				setSelectedSquare({ row, col });
-				const square = rowColToSquare(row, col, orientation);
-				const moves = game.moves({ square, verbose: true });
-				setPossibleMoves(moves);
-				setShowPieceSelector({ show: false, position: 0 });
-			} else {
+		// --- EXPOSE METHODS TO PARENT ---
+		useImperativeHandle(ref, () => ({
+			move: (
+				from: SquareType,
+				to: SquareType,
+				promotion: PromotionPieceType = "q"
+			) => {
+				// Called by Stockfish or Supabase
+				// AI/Auto moves usually specify promotion or default to Queen
+				executeMove(from, to, promotion);
+			},
+			reset: (fen?: string) => {
+				game.reset();
+				if (fen) game.load(fen);
+				setBoard(game.board());
+				setPieces(getInitialPieces(game.board()));
 				setSelectedSquare(null);
 				setPossibleMoves([]);
-				setPossibleMoves([]);
-				setShowPieceSelector({ show: false, position: 0 });
+			},
+			undo: () => {
+				game.undo();
+				setBoard(game.board());
+				setPieces(getInitialPieces(game.board())); // Lazy undo: just reset pieces from board
+			},
+		}));
+
+		// --- USER INTERACTION HANDLER ---
+		const handleSquarePress = useCallback(
+			(row: number, col: number) => {
+				const currentSelected = selectedSquareRef.current;
+
+				// 1. Clicked same square -> Deselect
+				if (currentSelected?.row === row && currentSelected?.col === col) {
+					setSelectedSquare(null);
+					setPossibleMoves([]);
+					setShowPieceSelector({ show: false, position: 0 });
+					return;
+				}
+
+				// 2. Try Move
+				if (currentSelected) {
+					const from = rowColToSquare(
+						currentSelected.row,
+						currentSelected.col,
+						orientation
+					);
+					const to = rowColToSquare(row, col, orientation);
+
+					// Check Promotion
+					const moves = game.moves({ verbose: true });
+					const isPromotion = moves.find(
+						(m) => m.from === from && m.to === to && m.flags.includes("p")
+					);
+
+					if (isPromotion) {
+						setPendingMove({ from: from as SquareType, to: to as SquareType });
+						setShowPieceSelector({ show: true, position: col });
+						return;
+					}
+
+					// Execute Move
+					const moveResult = executeMove(from, to);
+					if (moveResult) {
+						// Notify Parent!
+						if (onMove) onMove(moveResult);
+						return;
+					}
+				}
+
+				// 3. Select Piece
+				const currentBoard = game.board();
+				const piece = currentBoard[row][col];
+				const isMyPiece = piece?.color === orientation;
+
+				if (piece && isMyPiece) {
+					setSelectedSquare({ row, col });
+					const square = rowColToSquare(row, col, orientation);
+					const moves = game.moves({ square, verbose: true });
+					setPossibleMoves(moves);
+					setShowPieceSelector({ show: false, position: 0 });
+				} else {
+					setSelectedSquare(null);
+					setPossibleMoves([]);
+					setShowPieceSelector({ show: false, position: 0 });
+				}
+			},
+			[game, orientation, executeMove, onMove]
+		);
+
+		// --- PROMOTION HANDLER ---
+		const handlePromotionSelect = (type: PromotionPieceType) => {
+			if (pendingMove) {
+				const moveResult = executeMove(pendingMove.from, pendingMove.to, type);
+				if (moveResult && onMove) onMove(moveResult);
 			}
-		},
-		[game, orientation]
-	);
+			setShowPieceSelector({ show: false, position: 0 });
+		};
 
-	return (
-		<View style={{ position: "relative" }}>
-			{showPieceSelector?.show &&
-				(showPieceSelector?.position < 2 ? (
+		return (
+			<View style={{ position: "relative" }}>
+				{showPieceSelector?.show && (
 					<View
 						style={{
 							position: "absolute",
 							bottom: SQUARE_SIZE * 8 + 8,
-							left: showPieceSelector?.position,
+							left:
+								showPieceSelector.position < 4
+									? showPieceSelector.position * SQUARE_SIZE
+									: undefined,
+							right:
+								showPieceSelector.position >= 4
+									? (7 - showPieceSelector.position) * SQUARE_SIZE
+									: undefined,
+							zIndex: 20,
 						}}
 					>
-						<PieceSelector
-							color={orientation}
-							onPress={(type) => {
-								if (pendingMove) {
-									game.move({
-										from: pendingMove.from,
-										to: pendingMove.to,
-										promotion: type,
-									});
-									setBoard(game.board());
-									setSelectedSquare(null);
-									setPossibleMoves([]);
-									setPendingMove(null);
-
-									setPieces((prev) => {
-										const next = [...prev];
-										const colMap: Record<string, number> = {
-											a: 0,
-											b: 1,
-											c: 2,
-											d: 3,
-											e: 4,
-											f: 5,
-											g: 6,
-											h: 7,
-										};
-
-										const fromColStr = pendingMove.from[0];
-										const fromRowStr = pendingMove.from[1];
-										const fromCol = colMap[fromColStr];
-										const fromRow = 8 - parseInt(fromRowStr);
-
-										const toColStr = pendingMove.to[0];
-										const toRowStr = pendingMove.to[1];
-										const toCol = colMap[toColStr];
-										const toRow = 8 - parseInt(toRowStr);
-
-										const movingPieceIndex = next.findIndex(
-											(p) => p.row === fromRow && p.col === fromCol
-										);
-										if (movingPieceIndex !== -1) {
-											next[movingPieceIndex] = {
-												...next[movingPieceIndex],
-												row: toRow,
-												col: toCol,
-												type: type, // Promote!
-											};
-
-											const capturedIndex = next.findIndex(
-												(p) =>
-													p.row === toRow && p.col === toCol && p !== next[movingPieceIndex]
-											);
-											if (capturedIndex !== -1) next.splice(capturedIndex, 1);
-										}
-										return next;
-									});
-								}
-								setShowPieceSelector({ show: false, position: 0 });
-							}}
-						/>
+						<PieceSelector color={orientation} onPress={handlePromotionSelect} />
 					</View>
-				) : (
-					<View
-						style={{
-							position: "absolute",
-							bottom: SQUARE_SIZE * 8 + 8,
-							right: showPieceSelector?.position,
-						}}
-					>
-						<PieceSelector
-							color={orientation}
-							onPress={(type) => {
-								if (pendingMove) {
-									game.move({
-										from: pendingMove.from,
-										to: pendingMove.to,
-										promotion: type,
-									});
-									setBoard(game.board());
-									setSelectedSquare(null);
-									setPossibleMoves([]);
-									setPendingMove(null);
-
-									setPieces((prev) => {
-										const next = [...prev];
-										const colMap: Record<string, number> = {
-											a: 0,
-											b: 1,
-											c: 2,
-											d: 3,
-											e: 4,
-											f: 5,
-											g: 6,
-											h: 7,
-										};
-
-										const fromColStr = pendingMove.from[0];
-										const fromRowStr = pendingMove.from[1];
-										const fromCol = colMap[fromColStr];
-										const fromRow = 8 - parseInt(fromRowStr);
-
-										const toColStr = pendingMove.to[0];
-										const toRowStr = pendingMove.to[1];
-										const toCol = colMap[toColStr];
-										const toRow = 8 - parseInt(toRowStr);
-
-										const movingPieceIndex = next.findIndex(
-											(p) => p.row === fromRow && p.col === fromCol
-										);
-										if (movingPieceIndex !== -1) {
-											next[movingPieceIndex] = {
-												...next[movingPieceIndex],
-												row: toRow,
-												col: toCol,
-												type: type, // Promote!
-											};
-
-											const capturedIndex = next.findIndex(
-												(p) =>
-													p.row === toRow && p.col === toCol && p !== next[movingPieceIndex]
-											);
-											if (capturedIndex !== -1) next.splice(capturedIndex, 1);
-										}
-										return next;
-									});
-								}
-								setShowPieceSelector({ show: false, position: 0 });
-							}}
-						/>
-					</View>
-				))}
-			<View
-				style={{
-					position: "relative",
-					flexDirection: "row",
-					flexWrap: "wrap",
-					width: width,
-					height: width,
-					justifyContent: "center",
-					alignItems: "center",
-				}}
-			>
-				{/* Squares */}
-				{renderSquares(
-					orientation,
-					handleSquarePress,
-					selectedSquare,
-					possibleMoves
 				)}
+				<View
+					style={{
+						position: "relative",
+						flexDirection: "row",
+						flexWrap: "wrap",
+						width: width,
+						height: width,
+						justifyContent: "center",
+						alignItems: "center",
+					}}
+				>
+					{/* Squares */}
+					{renderSquares(
+						orientation,
+						handleSquarePress,
+						selectedSquare,
+						possibleMoves
+					)}
 
-				{/* Pieces */}
-				{pieces.map((piece) => (
-					<Piece
-						key={piece.id}
-						type={piece.type}
-						color={piece.color}
-						// Adjust visual row/col based on board orientation
-						row={orientation === "w" ? piece.row : 7 - piece.row}
-						col={orientation === "w" ? piece.col : 7 - piece.col}
-						onPress={handleSquarePress}
-						position={rowColToSquare(piece.row, piece.col, orientation)}
-						isSelected={
-							selectedSquare?.row === piece.row && selectedSquare?.col === piece.col
-						}
-					/>
-				))}
+					{/* Pieces */}
+					{pieces.map((piece) => (
+						<Piece
+							key={piece.id}
+							type={piece.type}
+							color={piece.color}
+							row={orientation === "w" ? piece.row : 7 - piece.row}
+							col={orientation === "w" ? piece.col : 7 - piece.col}
+							onPress={() => handleSquarePress(piece.row, piece.col)}
+							position={rowColToSquare(piece.row, piece.col, orientation)}
+							isSelected={
+								selectedSquare?.row === piece.row && selectedSquare?.col === piece.col
+							}
+						/>
+					))}
+				</View>
 			</View>
-		</View>
-	);
-}
+		);
+	}
+);
+
+export default ChessBoard;
