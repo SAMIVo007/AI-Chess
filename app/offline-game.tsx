@@ -20,7 +20,10 @@ import { useAuth } from "@/context/AuthContext";
 import { isGameActive } from "@/api/supabaseAPI";
 import { ActivityIndicator } from "react-native";
 import ChessBoard, { ChessBoardRef } from "@/components/chess/ChessBoard";
-import GameOverModal from "@/components/GameOverModal";
+import GameOverModal, {
+	GameEndReason,
+	GameResult,
+} from "@/components/GameOverModal";
 
 const { width } = Dimensions.get("window");
 
@@ -104,9 +107,9 @@ export default function GameScreen() {
 	// Game-over overlay state
 	const [gameOver, setGameOver] = useState<{
 		over: boolean;
-		resultText: string;
+		reason: GameEndReason;
 		winner: "w" | "b" | null;
-	}>({ over: false, resultText: "", winner: null });
+	}>({ over: false, reason: "checkmate", winner: null });
 	const [isModalVisible, setIsModalVisible] = useState(false);
 
 	// Voice toggle (optional)
@@ -152,9 +155,10 @@ export default function GameScreen() {
 							// White time runs out
 							setGameOver({
 								over: true,
-								resultText: "Time's up! Black wins!",
+								reason: "timeout",
 								winner: "b",
 							});
+							setIsModalVisible(true);
 							return 0;
 						}
 						return prev - 1;
@@ -165,9 +169,10 @@ export default function GameScreen() {
 							// Black time runs out
 							setGameOver({
 								over: true,
-								resultText: "Time's up! White wins!",
+								reason: "timeout",
 								winner: "w",
 							});
+							setIsModalVisible(true);
 							return 0;
 						}
 						return prev - 1;
@@ -257,25 +262,24 @@ export default function GameScreen() {
 
 	const checkGameOver = () => {
 		if (logicGame.game_over()) {
-			let resultText = "Game Over";
 			let winner: "w" | "b" | null = null;
-			let isDraw = false;
+			let reason: GameEndReason = "checkmate";
 
 			if (logicGame.in_checkmate()) {
 				// The player whose turn it is is checkmated, so the OTHER player wins
 				winner = logicGame.turn() === "w" ? "b" : "w";
-				resultText = "win";
-			} else if (
-				logicGame.in_draw() ||
-				logicGame.in_stalemate() ||
-				logicGame.in_threefold_repetition() ||
-				logicGame.insufficient_material()
-			) {
-				isDraw = true;
-				resultText = "draw";
+				reason = "checkmate";
+			} else if (logicGame.in_stalemate()) {
+				reason = "stalemate";
+			} else if (logicGame.in_threefold_repetition()) {
+				reason = "threefold_repetition";
+			} else if (logicGame.insufficient_material()) {
+				reason = "insufficient_material";
+			} else if (logicGame.in_draw()) {
+				reason = "draw";
 			}
 
-			setGameOver({ over: true, resultText, winner });
+			setGameOver({ over: true, reason, winner });
 			setIsModalVisible(true);
 			return true;
 		}
@@ -529,7 +533,15 @@ export default function GameScreen() {
 			{/* Game Over Overlay */}
 			<GameOverModal
 				isOpen={isModalVisible}
-				isWinner={gameOver.winner === (isPlayerWhite ? "w" : "b")}
+				result={
+					gameOver.winner === null
+						? "draw"
+						: gameOver.winner === (isPlayerWhite ? "w" : "b")
+						? "win"
+						: "loss"
+				}
+				reason={gameOver.reason}
+				playerColor={isPlayerWhite ? "w" : "b"}
 				onRematch={() => {
 					setIsModalVisible(false);
 					router.replace({

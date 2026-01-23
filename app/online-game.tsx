@@ -10,7 +10,10 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
-import GameOverModal from "@/components/GameOverModal";
+import GameOverModal, {
+	GameEndReason,
+	GameResult,
+} from "@/components/GameOverModal";
 import { ThemedView } from "@/components/ThemedView";
 import { Chess, Move, Square as SquareNotation } from "chess.js";
 import { startEngine, analyzePosition, stopEngine } from "@/utils/ai";
@@ -104,9 +107,9 @@ export default function GameScreen() {
 	// Game-over overlay state
 	const [gameOver, setGameOver] = useState<{
 		over: boolean;
-		resultText: string;
+		reason: GameEndReason;
 		winner: "w" | "b" | null;
-	}>({ over: false, resultText: "", winner: null });
+	}>({ over: false, reason: "checkmate", winner: null });
 	const [isModalVisible, setIsModalVisible] = useState(false);
 
 	// Online multiplayer state
@@ -270,13 +273,19 @@ export default function GameScreen() {
 
 							// Check Game Over
 							if (logicGame.game_over()) {
+								let reason: GameEndReason = "checkmate";
 								const winner = logicGame.in_checkmate()
 									? logicGame.turn() === "w"
 										? "b"
 										: "w"
 									: null;
-								const resultText = logicGame.in_checkmate() ? "Checkmate!" : "Draw";
-								setGameOver({ over: true, resultText, winner });
+								if (logicGame.in_stalemate()) reason = "stalemate";
+								else if (logicGame.in_threefold_repetition())
+									reason = "threefold_repetition";
+								else if (logicGame.insufficient_material())
+									reason = "insufficient_material";
+								else if (logicGame.in_draw()) reason = "draw";
+								setGameOver({ over: true, reason, winner });
 								setIsModalVisible(true);
 							}
 						}
@@ -303,9 +312,10 @@ export default function GameScreen() {
 							// White time runs out
 							setGameOver({
 								over: true,
-								resultText: "Time's up! Black wins!",
+								reason: "timeout",
 								winner: "b",
 							});
+							setIsModalVisible(true);
 							return 0;
 						}
 						return prev - 1;
@@ -316,9 +326,10 @@ export default function GameScreen() {
 							// Black time runs out
 							setGameOver({
 								over: true,
-								resultText: "Time's up! White wins!",
+								reason: "timeout",
 								winner: "w",
 							});
+							setIsModalVisible(true);
 							return 0;
 						}
 						return prev - 1;
@@ -374,13 +385,19 @@ export default function GameScreen() {
 				.eq("id", gameId);
 
 			if (logicGame.game_over()) {
+				let reason: GameEndReason = "checkmate";
 				const winner = logicGame.in_checkmate()
 					? logicGame.turn() === "w"
 						? "b"
 						: "w"
 					: null;
-				const resultText = logicGame.in_checkmate() ? "Checkmate!" : "Draw";
-				setGameOver({ over: true, resultText, winner });
+				if (logicGame.in_stalemate()) reason = "stalemate";
+				else if (logicGame.in_threefold_repetition())
+					reason = "threefold_repetition";
+				else if (logicGame.insufficient_material())
+					reason = "insufficient_material";
+				else if (logicGame.in_draw()) reason = "draw";
+				setGameOver({ over: true, reason, winner });
 				setIsModalVisible(true);
 			}
 		}
@@ -425,12 +442,8 @@ export default function GameScreen() {
 		)}`;
 
 	// Called by Board when game ends
-	const handleGameOver = (
-		resultText: string,
-
-		winner: "w" | "b" | null
-	) => {
-		setGameOver({ over: true, resultText, winner });
+	const handleGameOver = (reason: GameEndReason, winner: "w" | "b" | null) => {
+		setGameOver({ over: true, reason, winner });
 	};
 
 	// Rematch → clear history, reset overlay & clocks, bump gameKey
@@ -643,15 +656,22 @@ export default function GameScreen() {
 			{/* Game Over Overlay */}
 			<GameOverModal
 				isOpen={isModalVisible}
-				isWinner={
-					isPlayerWhite !== null && gameOver.winner === (isPlayerWhite ? "w" : "b")
+				result={
+					gameOver.winner === null
+						? "draw"
+						: isPlayerWhite !== null &&
+						  gameOver.winner === (isPlayerWhite ? "w" : "b")
+						? "win"
+						: "loss"
 				}
+				reason={gameOver.reason}
+				playerColor={isPlayerWhite ? "w" : "b"}
 				onRematch={() => {
 					// Implement rematch logic if needed
 					// For now, reload or create new logic
 					router.replace("/(tabs)");
 				}}
-				onNewGame={() => router.replace("/play-options")}
+				onNewGame={() => router.replace("/challenge-friends")}
 				onClose={() => setIsModalVisible(false)}
 			/>
 
