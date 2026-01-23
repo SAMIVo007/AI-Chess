@@ -23,11 +23,13 @@ import { useThemeColor } from "@/hooks/useThemeColor";
 interface JoinGameModalProps {
 	bottomSheetRef: any;
 	handleSheetChanges: (index: number) => void;
+	onClose: () => void;
 }
 
 export const JoinGameModal = ({
 	bottomSheetRef,
 	handleSheetChanges,
+	onClose,
 }: JoinGameModalProps) => {
 	const router = useRouter();
 	const { session } = useAuth();
@@ -35,7 +37,7 @@ export const JoinGameModal = ({
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 
-	const snapPoints = useMemo(() => ["30%"], []);
+	const snapPoints = useMemo(() => ["40%"], []);
 
 	const backgroundColor = useThemeColor({}, "background");
 	const iconColor = useThemeColor({}, "icon");
@@ -64,7 +66,7 @@ export const JoinGameModal = ({
 		try {
 			const gameId = await joinGameByInvite(joinCode.trim(), session.user.id);
 			if (gameId) {
-				bottomSheetRef.current?.close();
+				onClose();
 				// Move Guest to Game Screen
 				router.push({
 					pathname: "/online-game",
@@ -95,6 +97,7 @@ export const JoinGameModal = ({
 		<BottomSheet
 			ref={bottomSheetRef}
 			onChange={handleSheetChanges}
+			onClose={onClose}
 			snapPoints={snapPoints}
 			enablePanDownToClose
 			enableBlurKeyboardOnGesture
@@ -102,7 +105,7 @@ export const JoinGameModal = ({
 			backdropComponent={renderBackdrop}
 			backgroundStyle={{ backgroundColor: backgroundColor }}
 			handleIndicatorStyle={{ backgroundColor: "#9BA1A6" }}
-			index={-1}
+			// index={-1}
 		>
 			<BottomSheetView style={styles.contentContainer}>
 				<View style={styles.header}>

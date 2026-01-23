@@ -22,6 +22,7 @@ import { useThemeColor } from "@/hooks/useThemeColor";
 interface CreateGameModalProps {
 	bottomSheetRef: any;
 	handleSheetChanges: (index: number) => void;
+	onClose: () => void;
 }
 
 type ColorPreference = "white" | "black" | "random";
@@ -29,13 +30,14 @@ type ColorPreference = "white" | "black" | "random";
 export const CreateGameModal = ({
 	bottomSheetRef,
 	handleSheetChanges,
+	onClose,
 }: CreateGameModalProps) => {
 	const router = useRouter();
 	const { session } = useAuth();
 	const [loading, setLoading] = useState(false);
 	const [selectedColor, setSelectedColor] = useState<ColorPreference>("random");
 
-	const snapPoints = useMemo(() => ["45%"], []);
+	const snapPoints = useMemo(() => ["50%"], []);
 
 	const backgroundColor = useThemeColor({}, "background");
 	const textColor = useThemeColor({}, "text");
@@ -57,7 +59,7 @@ export const CreateGameModal = ({
 				// const webLink = `https://aichess.app/join/${result.inviteCode}`;
 
 				// 1. Close Modal
-				bottomSheetRef.current?.close();
+				onClose();
 
 				// 2. Share
 				const shareResult = await Share.share({
@@ -148,6 +150,7 @@ export const CreateGameModal = ({
 	return (
 		<BottomSheet
 			ref={bottomSheetRef}
+			onClose={onClose}
 			onChange={handleSheetChanges}
 			snapPoints={snapPoints}
 			enablePanDownToClose
@@ -156,7 +159,7 @@ export const CreateGameModal = ({
 			backdropComponent={renderBackdrop}
 			backgroundStyle={{ backgroundColor: backgroundColor }}
 			handleIndicatorStyle={{ backgroundColor: "#9BA1A6" }}
-			index={-1}
+			// index={-1}
 		>
 			<BottomSheetView style={styles.contentContainer}>
 				<View style={styles.header}>

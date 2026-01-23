@@ -52,14 +52,14 @@ export default function RootLayout() {
 	}
 
 	return (
-		<AuthContextProvider>
-			<GestureHandlerRootView>
+		<GestureHandlerRootView style={{ flex: 1 }}>
+			<AuthContextProvider>
 				<ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
 					<AppNavigator />
 					<StatusBar style="auto" />
 				</ThemeProvider>
-			</GestureHandlerRootView>
-		</AuthContextProvider>
+			</AuthContextProvider>
+		</GestureHandlerRootView>
 	);
 }
 
@@ -153,6 +153,7 @@ export const AppNavigator = () => {
 					options={{
 						title: "Play Options",
 						headerTitleAlign: "center",
+						headerShown: false,
 					}}
 				/>
 				<Stack.Screen
@@ -160,6 +161,7 @@ export const AppNavigator = () => {
 					options={{
 						title: "Play with Friends",
 						headerTitleAlign: "center",
+						headerShown: false,
 					}}
 				/>
 				<Stack.Screen name="+not-found" />
