@@ -74,7 +74,10 @@ export default function RecentGamesList() {
 		return (
 			<TouchableOpacity
 				onPress={() =>
-					router.push({ pathname: "/online-game", params: { gameId: item.id } })
+					router.push({
+						pathname: "/online-game",
+						params: { gameId: item.id, inviteCode: item.invite_code },
+					})
 				}
 				className="bg-white dark:bg-gray-800 p-4 mb-3 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex-row justify-between items-center"
 			>
@@ -130,6 +133,20 @@ export default function RecentGamesList() {
 
 	return (
 		<View>
+			<View className="mt-4 mb-4 flex-row items-center justify-between">
+				<Text className="text-xl font-bold text-gray-900 dark:text-white">
+					Recent Games
+				</Text>
+				<TouchableOpacity
+					onPress={() => {
+						loadGames();
+					}}
+				>
+					<Text className="text-indigo-600 dark:text-indigo-400 font-semibold">
+						See All
+					</Text>
+				</TouchableOpacity>
+			</View>
 			<FlatList
 				data={games}
 				renderItem={renderGameItem}

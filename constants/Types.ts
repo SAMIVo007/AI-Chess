@@ -1,5 +1,12 @@
 import { PieceType, PieceColor, SquareColor, Square, Move } from "chess.js";
 
+export type Profile = {
+	id: string;
+	username?: string;
+	avatar_url?: string;
+	full_name?: string;
+};
+
 export type PromotionPieceType = "q" | "r" | "b" | "n";
 
 export interface Friend {

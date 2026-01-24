@@ -5,7 +5,6 @@ import {
 	Text,
 	TouchableOpacity,
 	FlatList,
-	Image,
 	Dimensions,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -24,10 +23,11 @@ import GameOverModal, {
 	GameEndReason,
 	GameResult,
 } from "@/components/GameOverModal";
+import { CapturedPieces } from "@/components/chess/CapturedPieces";
+import { Image } from "expo-image";
+import { AiBlurhash, UserBlurhash } from "@/constants/Blurhashes";
 
 const { width } = Dimensions.get("window");
-
-const AVATAR_SIZE = 48;
 
 const getDescriptiveMove = (
 	game: InstanceType<typeof Chess>,
@@ -93,9 +93,36 @@ const getDescriptiveMove = (
 	return moveText;
 };
 
+const getRating = (levelSelected: string): string => {
+	switch (levelSelected) {
+		case "1":
+			return "800";
+		case "2":
+			return "1000";
+		case "3":
+			return "1200";
+		case "4":
+			return "1400";
+		case "5":
+			return "1600";
+		case "6":
+			return "1800";
+		case "7":
+			return "2000";
+		case "8":
+			return "2200";
+		case "9":
+			return "2400";
+		case "10":
+			return "2600";
+		default:
+			return "1600";
+	}
+};
+
 export default function GameScreen() {
 	const router = useRouter();
-	const { session } = useAuth();
+	const { session, profile } = useAuth();
 	const { levelSelected, timeSelected, playerColor } = useLocalSearchParams<{
 		levelSelected: string;
 		timeSelected: string;
@@ -103,6 +130,7 @@ export default function GameScreen() {
 	}>();
 
 	console.log("Game params:", { levelSelected, timeSelected, playerColor });
+	console.log("user: ", profile);
 
 	// Game-over overlay state
 	const [gameOver, setGameOver] = useState<{
@@ -111,6 +139,10 @@ export default function GameScreen() {
 		winner: "w" | "b" | null;
 	}>({ over: false, reason: "checkmate", winner: null });
 	const [isModalVisible, setIsModalVisible] = useState(false);
+
+	// Captured pieces
+	const [capturedByWhite, setCapturedByWhite] = useState<PieceType[]>([]);
+	const [capturedByBlack, setCapturedByBlack] = useState<PieceType[]>([]);
 
 	// Voice toggle (optional)
 	const [voiceOn, setVoiceOn] = useState(true);
@@ -215,6 +247,19 @@ export default function GameScreen() {
 		logicGame.move(move); // Sync local logic
 		setIsMyTurn(false); // Immediate lock
 
+		// Track captured pieces
+		const history = logicGame.history({ verbose: true });
+		const w: PieceType[] = [];
+		const b: PieceType[] = [];
+		history.forEach((m) => {
+			if (m.captured) {
+				if (m.color === "w") w.push(m.captured);
+				else b.push(m.captured);
+			}
+		});
+		setCapturedByWhite(w);
+		setCapturedByBlack(b);
+
 		// 2. Trigger AI response
 		if (!checkGameOver()) {
 			const level = levelSelected ? parseInt(levelSelected, 10) : 5;
@@ -315,11 +360,26 @@ export default function GameScreen() {
 						// Also update the game state
 						logicGame.move({ from, to, promotion });
 
+						// Track captures
+						const history = logicGame.history({ verbose: true });
+						const w: PieceType[] = [];
+						const b: PieceType[] = [];
+						history.forEach((m) => {
+							if (m.captured) {
+								if (m.color === "w") w.push(m.captured);
+								else b.push(m.captured);
+							}
+						});
+						setCapturedByWhite(w);
+						setCapturedByBlack(b);
+
 						// Update state and switch active player
 						setActivePlayer("w"); // After AI (black) moves, it's white's turn
 						setIsMyTurn(true);
 
-						checkGameOver();
+						setTimeout(() => {
+							checkGameOver();
+						}, 1000);
 
 						// Voice feedback
 						if (voiceOnRef.current) {
@@ -390,87 +450,113 @@ export default function GameScreen() {
 				<Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">
 					{!!timeSelected ? "Time Attack" : "Unlimited Time"}
 				</Text>
-				<TouchableOpacity className="p-2">
+				<TouchableOpacity className="p-2 opacity-0" disabled>
 					<MaterialIcons name="settings" size={24} color="lightgray" />
 				</TouchableOpacity>
 			</View>
 
 			{/* Players & Clocks */}
-			<View className="flex-row justify-between px-12 mt-4">
-				{/* White Player */}
-				<View className="items-center">
-					<Image
-						source={{
-							uri:
-								(isPlayerWhite ? session?.user.aud : "") ||
-								"https://www.shutterstock.com/image-vector/young-smiling-man-avatar-brown-600nw-2261401207.jpg",
-						}}
-						className="rounded-full"
-						style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
-					/>
-					<Text className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">
-						{isPlayerWhite ? session?.user.aud : "AI"}
-					</Text>
-					<View
-						className={`mt-1 px-3 py-1 rounded-full shadow ${
-							activePlayer === "w" && gameStarted && !gameOver.over
-								? "bg-green-500"
-								: "bg-white dark:bg-gray-800"
-						}`}
-					>
-						<Text
-							className={`text-sm font-mono ${
-								activePlayer === "w" && gameStarted && !gameOver.over
-									? "text-white font-bold"
-									: "text-gray-800 dark:text-gray-200"
-							}`}
-						>
-							{!!timeSelected ? formatTime(whiteTime || 0) : "∞"}
-						</Text>
+			<View className="flex-1 justify-center px-4 w-full max-w-[500px] self-center">
+				{/* Opponent (Top) */}
+				<View className="flex-row items-center justify-between mb-6">
+					<View className="flex-row items-center">
+						<View className="rounded-full w-14 h-14 mr-3 border border-gray-300 dark:border-gray-600 justify-center items-center overflow-hidden">
+							<Image
+								source={{
+									uri: "https://is1-ssl.mzstatic.com/image/thumb/Purple3/v4/30/35/ae/3035ae18-d9f9-7c3e-bf6d-055bff5c5d5a/mzl.rhnwdrfl.png/1024x1024bb.png",
+								}}
+								style={{ width: "100%", height: "100%" }}
+								placeholder={{ blurhash: AiBlurhash }}
+								contentFit="cover"
+								transition={1000}
+							/>
+						</View>
+						<View>
+							<Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+								Stockfish AI ({getRating(levelSelected)})
+							</Text>
+							<CapturedPieces
+								captured={isPlayerWhite ? capturedByBlack : capturedByWhite}
+								color={isPlayerWhite ? "w" : "b"}
+							/>
+						</View>
 					</View>
-				</View>
 
-				{/* Black Player */}
-				<View className="items-center">
-					<Image
-						source={{
-							uri:
-								(isPlayerWhite ? "" : "AI") ||
-								"https://www.shutterstock.com/image-vector/young-smiling-man-avatar-3d-600nw-2124054758.jpg",
-						}}
-						className="rounded-full"
-						style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
-					/>
-					<Text className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">
-						{isPlayerWhite ? "AI" : session?.user.aud}
-					</Text>
 					<View
-						className={`mt-1 px-3 py-1 rounded-full shadow ${
+						className={`px-3 py-1 rounded-md shadow-sm ${
 							activePlayer === "b" && gameStarted && !gameOver.over
-								? "bg-green-500"
-								: "bg-white dark:bg-gray-800"
+								? "bg-gray-800 dark:bg-gray-700 border-b-4 border-gray-600"
+								: "bg-gray-200 dark:bg-gray-800"
 						}`}
 					>
 						<Text
-							className={`text-sm font-mono ${
+							className={`text-lg font-mono font-bold ${
 								activePlayer === "b" && gameStarted && !gameOver.over
-									? "text-white font-bold"
-									: "text-gray-800 dark:text-gray-200"
+									? "text-white"
+									: "text-gray-600 dark:text-gray-400"
 							}`}
 						>
 							{!!timeSelected ? formatTime(blackTime || 0) : "∞"}
 						</Text>
 					</View>
 				</View>
-			</View>
 
-			{/* Board Area */}
-			<View className="flex-1 items-center justify-center">
-				<ChessBoard
-					ref={chessBoardRef}
-					orientation={isPlayerWhite ? "w" : "b"}
-					onMove={onMyMove}
-				/>
+				{/* Board Area */}
+				<View className="items-center justify-center my-2 shadow-lg w-full aspect-square">
+					<ChessBoard
+						ref={chessBoardRef}
+						orientation={isPlayerWhite ? "w" : "b"}
+						onMove={onMyMove}
+					/>
+				</View>
+
+				{/* Player (Bottom) */}
+				<View className="flex-row items-center justify-between mt-6">
+					<View className="flex-row items-center">
+						<View className="rounded-full w-14 h-14 mr-3 border border-gray-300 dark:border-gray-600 justify-center items-center overflow-hidden">
+							{profile?.avatar_url ? (
+								<Image
+									source={{
+										uri: profile?.avatar_url,
+									}}
+									style={{ width: "100%", height: "100%" }}
+									placeholder={{ blurhash: UserBlurhash }}
+									contentFit="cover"
+									transition={1000}
+								/>
+							) : (
+								<FontAwesome5 name="user" size={22} color="gray" />
+							)}
+						</View>
+						<View>
+							<Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+								{profile?.username || session?.user?.email?.split("@")[0] || "Player"}
+							</Text>
+							<CapturedPieces
+								captured={isPlayerWhite ? capturedByWhite : capturedByBlack}
+								color={isPlayerWhite ? "b" : "w"}
+							/>
+						</View>
+					</View>
+
+					<View
+						className={`px-3 py-1 rounded-md shadow-sm ${
+							activePlayer === "w" && gameStarted && !gameOver.over
+								? "bg-white dark:bg-gray-200 border-b-4 border-gray-300"
+								: "bg-gray-200 dark:bg-gray-800"
+						}`}
+					>
+						<Text
+							className={`text-lg font-mono font-bold ${
+								activePlayer === "w" && gameStarted && !gameOver.over
+									? "text-black"
+									: "text-gray-600 dark:text-gray-400"
+							}`}
+						>
+							{!!timeSelected ? formatTime(whiteTime || 0) : "∞"}
+						</Text>
+					</View>
+				</View>
 			</View>
 
 			{/* Move List */}

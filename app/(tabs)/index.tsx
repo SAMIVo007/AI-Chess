@@ -9,7 +9,7 @@ import RecentGamesList from "@/components/RecentGamesList";
 
 export default function HomeScreen() {
 	const router = useRouter();
-	const { session } = useAuth();
+	const { session, profile } = useAuth();
 	const [greeting, setGreeting] = useState("");
 
 	useEffect(() => {
@@ -61,7 +61,9 @@ export default function HomeScreen() {
 						{greeting}
 					</Text>
 					<Text className="text-white text-3xl font-bold">
-						{session?.user?.email?.split("@")[0] || "Chess Master"}
+						{profile?.username ||
+							session?.user?.email?.split("@")[0] ||
+							"Chess Master"}
 					</Text>
 				</View>
 				<TouchableOpacity className="bg-gray-800 p-2 rounded-full border border-gray-700">
@@ -105,16 +107,7 @@ export default function HomeScreen() {
 			headerBackgroundColor={{ dark: "#121212", light: "#121212" }}
 		>
 			<View className="flex-1 px-5 rounded-t-[32px] min-h-screen">
-				<View className="mt-4 mb-4 flex-row items-center justify-between">
-					<Text className="text-xl font-bold text-gray-900 dark:text-white">
-						Recent Games
-					</Text>
-					<TouchableOpacity>
-						<Text className="text-indigo-600 dark:text-indigo-400 font-semibold">
-							See All
-						</Text>
-					</TouchableOpacity>
-				</View>
+			
 
 				<RecentGamesList />
 
