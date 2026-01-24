@@ -188,11 +188,11 @@ export default function GameOverModal({
 							entering={FadeIn.delay(500).duration(300)}
 							style={styles.playerInfo}
 						>
-							<View style={styles.playerBadge}>
+							<View style={styles.playerBadge}> 
 								<FontAwesome5
 									name="chess-pawn"
 									size={14}
-									color={playerColor === "w" ? "#18181b" : "#fafafa"}
+									color={playerColor === "w" ? "#fafafa" : "#18181b"}
 								/>
 								<Text style={styles.playerText}>
 									You played as {playerColor === "w" ? "White" : "Black"}

@@ -61,21 +61,21 @@ export const CreateGameModal = ({
 				// 1. Close Modal
 				onClose();
 
-				// 2. Share
-				const shareResult = await Share.share({
-					message: `🏁 Join my chess game! I'm playing as ${result.playerColor}.\n\n🔗 Link: ${deepLink}\n\n📱 Code: ${result.inviteCode}`,
-					title: "Chess Game Invite",
-					url: deepLink,
-				});
+				// // 2. Share
+				// const shareResult = await Share.share({
+				// 	message: `🏁 Join my chess game! I'm playing as ${result.playerColor}.\n\n🔗 Link: ${deepLink}\n\n📱 Code: ${result.inviteCode}`,
+				// 	title: "Chess Game Invite",
+				// 	url: deepLink,
+				// });
 
 				// 3. Navigate to Game (regardless of share result, so user can wait)
 				// We wait a bit if share is dismissed to ensure smooth transition
 				setTimeout(() => {
 					router.push({
 						pathname: "/online-game",
-						params: { gameId: result.gameId },
+						params: { gameId: result.gameId, inviteCode: result.inviteCode },
 					});
-				}, 500);
+				}, 100);
 			}
 		} catch (error) {
 			console.error("Error creating game:", error);

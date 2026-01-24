@@ -5,25 +5,27 @@ import {
 	Text,
 	TouchableOpacity,
 	FlatList,
-	Image,
 	Dimensions,
+	Share,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import { MaterialIcons, FontAwesome5, Ionicons } from "@expo/vector-icons";
 import GameOverModal, {
 	GameEndReason,
 	GameResult,
 } from "@/components/GameOverModal";
+import { WaitingOverlay } from "@/components/WaitingOverlay";
+import { CapturedPieces } from "@/components/chess/CapturedPieces";
 import { ThemedView } from "@/components/ThemedView";
-import { Chess, Move, Square as SquareNotation } from "chess.js";
-import { startEngine, analyzePosition, stopEngine } from "@/utils/ai";
-import { speakMove } from "@/utils/voice";
-import { PieceType } from "chess.js";
+import { Chess, Move, PieceType, Square as SquareNotation } from "chess.js";
 import { supabase } from "@/utils/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { isGameActive } from "@/api/supabaseAPI";
 import { ActivityIndicator } from "react-native";
 import ChessBoard, { ChessBoardRef } from "@/components/chess/ChessBoard";
+import { Profile } from "@/constants/Types";
+import { Image } from "expo-image";
+import { UserBlurhash } from "@/constants/Blurhashes";
 
 const { width } = Dimensions.get("window");
 
@@ -95,14 +97,21 @@ const getDescriptiveMove = (
 
 export default function GameScreen() {
 	const router = useRouter();
-	const { session } = useAuth();
-	const { levelSelected, timeSelected, gameId } = useLocalSearchParams<{
-		levelSelected: string;
-		timeSelected: string;
-		gameId?: string;
-	}>();
+	const { session, profile } = useAuth();
+	const { levelSelected, timeSelected, gameId, inviteCode } =
+		useLocalSearchParams<{
+			levelSelected: string;
+			timeSelected: string;
+			gameId?: string;
+			inviteCode?: string;
+		}>();
 
-	console.log("Game params:", { levelSelected, timeSelected, gameId });
+	// console.log("Game params:", {
+	// 	levelSelected,
+	// 	timeSelected,
+	// 	gameId,
+	// 	inviteCode,
+	// });
 
 	// Game-over overlay state
 	const [gameOver, setGameOver] = useState<{
@@ -112,11 +121,13 @@ export default function GameScreen() {
 	}>({ over: false, reason: "checkmate", winner: null });
 	const [isModalVisible, setIsModalVisible] = useState(false);
 
+	// Captured pieces
+	const [capturedByWhite, setCapturedByWhite] = useState<PieceType[]>([]);
+	const [capturedByBlack, setCapturedByBlack] = useState<PieceType[]>([]);
+
 	// Online multiplayer state
 	const [isPlayerWhite, setIsPlayerWhite] = useState<boolean | null>(null);
-	const [opponentName, setOpponentName] = useState<string>("Opponent");
-	const [opponentAvatar, setOpponentAvatar] = useState<string | null>(null);
-	const [myAvatar, setMyAvatar] = useState<string | null>(null);
+	const [opponentProfile, setOpponentProfile] = useState<Profile | null>(null);
 	const [isMyTurn, setIsMyTurn] = useState(false);
 	const [status, setStatus] = useState<
 		"pending" | "waiting" | "active" | "completed"
@@ -158,23 +169,16 @@ export default function GameScreen() {
 		}
 	}, [gameId]);
 
-	const fetchProfile = async (userId: string, isMe: boolean) => {
+	const fetchOpponentProfile = async (userId: string) => {
 		try {
 			const { data, error } = await supabase
 				.from("profiles")
-				.select("username, avatar_url")
+				.select("*")
 				.eq("id", userId)
 				.single();
 
 			if (data) {
-				if (isMe) {
-					// We don't usually display our own name specifically besides "You",
-					// but if we wanted to: setActivePlayerName...
-					if (data.avatar_url) setMyAvatar(data.avatar_url);
-				} else {
-					setOpponentName(data.username || "Opponent");
-					if (data.avatar_url) setOpponentAvatar(data.avatar_url);
-				}
+				setOpponentProfile(data);
 			}
 		} catch (e) {
 			console.error("Error fetching profile:", e);
@@ -206,13 +210,10 @@ export default function GameScreen() {
 
 			// Fetch opponent profile if they exist
 			if (isWhite && gameData.black_player_id) {
-				fetchProfile(gameData.black_player_id, false);
+				fetchOpponentProfile(gameData.black_player_id);
 			} else if (!isWhite && gameData.white_player_id) {
-				fetchProfile(gameData.white_player_id, false);
+				fetchOpponentProfile(gameData.white_player_id);
 			}
-
-			// Fetch my own avatar
-			fetchProfile(session.user.id, true);
 
 			// Load game state if it exists
 			if (gameData.fen) {
@@ -234,6 +235,7 @@ export default function GameScreen() {
 			}
 
 			// Realtime Subscription
+			console.log(`Subscribing to channel: game-${gameId}`);
 			const channel = supabase
 				.channel(`game-${gameId}`)
 				.on(
@@ -245,16 +247,25 @@ export default function GameScreen() {
 						filter: `id=eq.${gameId}`,
 					},
 					(payload) => {
+						console.log("Received Realtime Update:", payload);
 						const newData = payload.new;
 
 						// 1. Status Update
-						if (newData.status === "active" && status !== "active") {
+						if (newData.status === "active") {
 							setStatus("active");
 							setGameStarted(true);
+
+							// Fetch opponent info if we don't have it yet (e.g. we created the game)
+							if (isWhite && newData.black_player_id) {
+								fetchOpponentProfile(newData.black_player_id);
+							} else if (!isWhite && newData.white_player_id) {
+								fetchOpponentProfile(newData.white_player_id);
+							}
 						}
 
 						// 2. Handle Moves (Opponent)
 						if (newData.fen !== logicGame.fen()) {
+							console.log("Opponent moved! Updating board...");
 							// Determine the move that just happened
 							// We can't easily guess the 'from-to' just from FEN without complex diffing.
 							// OPTION A: Just reset the board (Animation snaps, but it works)
@@ -264,6 +275,30 @@ export default function GameScreen() {
 							// For now, let's use reset to ensure sync, then logicGame update
 							logicGame.load(newData.fen);
 							chessBoardRef.current?.reset(newData.fen); // Sync visual board
+
+							// Sync Captured Pieces based on FEN diff (approximate) or just re-calculate from history if available
+							// Since we don't have full history from just FEN updates easily without PGN,
+							// we will try to rely on logicGame state if it has history.
+							// However, logicGame.load(fen) CLEARS history.
+							// So for online spectator/updates, capturing pieces accurately requires PGN syncing.
+							// For MVP, we might miss captures if we just load FEN.
+							// TODO: Sync PGN for accurate history.
+							// For now, let's just clear captures if we reload FEN, or try to init from PGN if available.
+							if (newData.pgn) {
+								logicGame.load_pgn(newData.pgn);
+								// Now we can get history
+								const history = logicGame.history({ verbose: true });
+								const w: PieceType[] = [];
+								const b: PieceType[] = [];
+								history.forEach((m) => {
+									if (m.captured) {
+										if (m.color === "w") w.push(m.captured);
+										else b.push(m.captured);
+									}
+								});
+								setCapturedByWhite(w);
+								setCapturedByBlack(b);
+							}
 
 							// Update Turn and Active Player
 							const turn = logicGame.turn(); // 'w' or 'b'
@@ -383,6 +418,19 @@ export default function GameScreen() {
 					status: logicGame.game_over() ? "completed" : "active",
 				})
 				.eq("id", gameId);
+
+			// Track captures
+			const history = logicGame.history({ verbose: true });
+			const w: PieceType[] = [];
+			const b: PieceType[] = [];
+			history.forEach((m) => {
+				if (m.captured) {
+					if (m.color === "w") w.push(m.captured);
+					else b.push(m.captured);
+				}
+			});
+			setCapturedByWhite(w);
+			setCapturedByBlack(b);
 
 			if (logicGame.game_over()) {
 				let reason: GameEndReason = "checkmate";
@@ -514,98 +562,117 @@ export default function GameScreen() {
 				<Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">
 					{!!timeSelected ? "Time Attack" : "Unlimited Time"}
 				</Text>
-				<TouchableOpacity className="p-2">
+				<TouchableOpacity className="p-2 opacity-0" disabled>
 					<MaterialIcons name="settings" size={24} color="lightgray" />
 				</TouchableOpacity>
 			</View>
 
 			{/* Players & Clocks */}
-			<View className="flex-row justify-between px-12 mt-4">
-				{/* White Player */}
-				<View className="items-center">
-					<Image
-						source={{
-							uri:
-								(isPlayerWhite ? opponentAvatar : myAvatar) ||
-								"https://www.shutterstock.com/image-vector/young-smiling-man-avatar-brown-600nw-2261401207.jpg",
-						}}
-						className="rounded-full"
-						style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
-					/>
-					<Text className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">
-						{isPlayerWhite ? session?.user.aud : opponentName}
-					</Text>
-					<View
-						className={`mt-1 px-3 py-1 rounded-full shadow ${
-							activePlayer === "w" && gameStarted && !gameOver.over
-								? "bg-green-500"
-								: "bg-white dark:bg-gray-800"
-						}`}
-					>
-						<Text
-							className={`text-sm font-mono ${
-								activePlayer === "w" && gameStarted && !gameOver.over
-									? "text-white font-bold"
-									: "text-gray-800 dark:text-gray-200"
-							}`}
-						>
-							{!!timeSelected ? formatTime(whiteTime || 0) : "∞"}
-						</Text>
+			<View className="flex-1 justify-center px-4 w-full max-w-[500px] self-center">
+				{/* Opponent (Top) */}
+				<View className="flex-row items-center justify-between mb-6">
+					<View className="flex-row items-center">
+						<View className="rounded-full w-14 h-14 mr-3 border border-gray-300 dark:border-gray-600 justify-center items-center overflow-hidden">
+							{opponentProfile?.avatar_url ? (
+								<Image
+									source={{
+										uri: opponentProfile?.avatar_url,
+									}}
+									style={{ width: "100%", height: "100%" }}
+									placeholder={{ blurhash: UserBlurhash }}
+									contentFit="cover"
+									transition={1000}
+								/>
+							) : (
+								<FontAwesome5 name="user" size={22} color="gray" />
+							)}
+						</View>
+						<View>
+							<Text className="text-base font-semibold text-gray-900 dark:text-gray-100">
+								{opponentProfile?.username || "Opponent"}
+							</Text>
+							<CapturedPieces
+								captured={isPlayerWhite ? capturedByBlack : capturedByWhite}
+								color={isPlayerWhite ? "w" : "b"}
+							/>
+						</View>
 					</View>
-				</View>
 
-				{/* Black Player */}
-				<View className="items-center">
-					<Image
-						source={{
-							uri:
-								(isPlayerWhite ? myAvatar : opponentAvatar) ||
-								"https://www.shutterstock.com/image-vector/young-smiling-man-avatar-3d-600nw-2124054758.jpg",
-						}}
-						className="rounded-full"
-						style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
-					/>
-					<Text className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">
-						{isPlayerWhite ? opponentName : session?.user.aud}
-					</Text>
 					<View
-						className={`mt-1 px-3 py-1 rounded-full shadow ${
+						className={`px-3 py-1 rounded-md shadow-sm ${
 							activePlayer === "b" && gameStarted && !gameOver.over
-								? "bg-green-500"
-								: "bg-white dark:bg-gray-800"
+								? "bg-gray-800 dark:bg-gray-700 border-b-4 border-gray-600"
+								: "bg-gray-200 dark:bg-gray-800"
 						}`}
 					>
 						<Text
-							className={`text-sm font-mono ${
+							className={`text-lg font-mono font-bold ${
 								activePlayer === "b" && gameStarted && !gameOver.over
-									? "text-white font-bold"
-									: "text-gray-800 dark:text-gray-200"
+									? "text-white"
+									: "text-gray-600 dark:text-gray-400"
 							}`}
 						>
 							{!!timeSelected ? formatTime(blackTime || 0) : "∞"}
 						</Text>
 					</View>
 				</View>
-			</View>
 
-			{/* Board Area */}
-			<View className="flex-1 items-center justify-center">
-				<ChessBoard
-					ref={chessBoardRef}
-					orientation={isPlayerWhite ? "w" : "b"}
-					onMove={onMyMove}
-				/>
-			</View>
+				{/* Board Area */}
+				<View className="items-center justify-center my-2 shadow-lg w-full aspect-square">
+					<ChessBoard
+						ref={chessBoardRef}
+						orientation={isPlayerWhite ? "w" : "b"}
+						onMove={onMyMove}
+					/>
+				</View>
 
-			{/* Turn Indicator for Online Games */}
-			<View className="py-2 px-4">
-				<Text
-					className={`text-center text-lg font-semibold ${
-						isMyTurn ? "text-green-600" : "text-orange-600"
-					}`}
-				>
-					{isMyTurn ? "Your Turn" : "Opponent's Turn"}
-				</Text>
+				{/* Player (Bottom) */}
+				<View className="flex-row items-center justify-between mt-6">
+					<View className="flex-row items-center">
+						<View className="rounded-full w-14 h-14 mr-3 border border-gray-300 dark:border-gray-600 justify-center items-center overflow-hidden">
+							{profile?.avatar_url ? (
+								<Image
+									source={{
+										uri: profile?.avatar_url,
+									}}
+									style={{ width: "100%", height: "100%" }}
+									placeholder={{ blurhash: UserBlurhash }}
+									contentFit="cover"
+									transition={1000}
+								/>
+							) : (
+								<FontAwesome5 name="user" size={22} color="gray" />
+							)}
+						</View>
+						<View>
+							<Text className="text-base font-semibold text-gray-900 dark:text-gray-100">
+								{profile?.username || "Player"}
+							</Text>
+							<CapturedPieces
+								captured={isPlayerWhite ? capturedByWhite : capturedByBlack}
+								color={isPlayerWhite ? "b" : "w"}
+							/>
+						</View>
+					</View>
+
+					<View
+						className={`px-3 py-1 rounded-md shadow-sm ${
+							activePlayer === "w" && gameStarted && !gameOver.over
+								? "bg-white dark:bg-gray-200 border-b-4 border-gray-300"
+								: "bg-gray-200 dark:bg-gray-800"
+						}`}
+					>
+						<Text
+							className={`text-lg font-mono font-bold ${
+								activePlayer === "w" && gameStarted && !gameOver.over
+									? "text-black"
+									: "text-gray-600 dark:text-gray-400"
+							}`}
+						>
+							{!!timeSelected ? formatTime(whiteTime || 0) : "∞"}
+						</Text>
+					</View>
+				</View>
 			</View>
 
 			{/* Move List */}
@@ -667,24 +734,15 @@ export default function GameScreen() {
 				reason={gameOver.reason}
 				playerColor={isPlayerWhite ? "w" : "b"}
 				onRematch={() => {
-					// Implement rematch logic if needed
-					// For now, reload or create new logic
-					router.replace("/(tabs)");
+					// Implement rematch logic later
+					router.replace("/challenge-friends");
 				}}
 				onNewGame={() => router.replace("/challenge-friends")}
 				onClose={() => setIsModalVisible(false)}
 			/>
 
 			{status === "waiting" && (
-				<View className="absolute inset-0 bg-black/80 items-center justify-center p-4 z-20">
-					<Text className="text-white text-xl font-bold mb-4">
-						Waiting for opponent...
-					</Text>
-					<ActivityIndicator size="large" color="#fff" />
-					<Text className="text-gray-300 mt-4 text-center">
-						Share the invite code with a friend to start playing!
-					</Text>
-				</View>
+				<WaitingOverlay inviteCode={inviteCode} onCancel={() => router.back()} />
 			)}
 		</ThemedView>
 	);

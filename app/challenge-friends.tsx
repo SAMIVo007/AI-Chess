@@ -110,7 +110,6 @@ export default function ChallengeFriends() {
 					handleSheetChanges={handleSheetChanges}
 					onClose={() => {
 						joinBottomSheetRef.current?.close();
-						// setTimeout(() => setShowJoin(false), 150);
 						setShowJoin(false);
 					}}
 				/>
@@ -122,7 +121,6 @@ export default function ChallengeFriends() {
 					handleSheetChanges={handleSheetChanges}
 					onClose={() => {
 						createBottomSheetRef.current?.close();
-						// setTimeout(() => setShowCreate(false), 150);
 						setShowCreate(false);
 					}}
 				/>
