@@ -14,7 +14,7 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-
+import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useAuth } from "@/context/AuthContext";
 import { joinGameByInvite } from "@/api/supabaseAPI";
@@ -48,6 +48,8 @@ export const JoinGameModal = ({
 	);
 
 	const handleJoinGame = async () => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
 		if (!joinCode.trim()) {
 			setError("Please enter a valid invite code.");
 			return;
@@ -120,7 +122,7 @@ export const JoinGameModal = ({
 						styles.inputContainer,
 						{
 							backgroundColor: inputBackground,
-							borderColor: error ? "red" : "transparent",
+							borderColor: error ? "#EA4335" : "transparent",
 							borderWidth: error ? 1 : 0,
 						},
 					]}
@@ -128,7 +130,7 @@ export const JoinGameModal = ({
 					<Feather
 						name="hash"
 						size={20}
-						color={error ? "red" : iconColor}
+						color={error ? "#EA4335" : iconColor}
 						style={styles.inputIcon}
 					/>
 					<BottomSheetTextInput
@@ -234,10 +236,10 @@ const styles = StyleSheet.create({
 	cancelButtonText: {
 		fontSize: 18,
 		fontWeight: "600",
-		color: "#FF453A", // System red for destructive/cancel actions
+		color: "#EA4335", // System red for destructive/cancel actions
 	},
 	errorText: {
-		color: "#FF453A",
+		color: "#EA4335",
 		fontSize: 14,
 		textAlign: "center",
 		marginBottom: 16,

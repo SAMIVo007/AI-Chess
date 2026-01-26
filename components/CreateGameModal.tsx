@@ -13,7 +13,7 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
-
+import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useAuth } from "@/context/AuthContext";
 import { createGameWithInvite } from "@/api/supabaseAPI";
@@ -43,6 +43,8 @@ export const CreateGameModal = ({
 	const textColor = useThemeColor({}, "text");
 
 	const handleCreateGame = async () => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
 		if (!session?.user) {
 			Alert.alert("Error", "You must be logged in to create a game.");
 			return;

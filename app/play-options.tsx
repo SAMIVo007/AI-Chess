@@ -5,11 +5,14 @@ import {
 	TouchableOpacity,
 	ScrollView,
 	Dimensions,
+	Switch,
 } from "react-native";
 import { ThemedView } from "@/components/ThemedView";
 import Slider from "@react-native-community/slider";
 import { MaterialCommunityIcons, FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { PressableScale } from "pressto";
+import * as Haptics from "expo-haptics";
 
 const { width } = Dimensions.get("window");
 
@@ -18,6 +21,7 @@ export default function PlayOptions() {
 
 	const [difficulty, setDifficulty] = useState(10); // 0-20
 	const [playerColor, setPlayerColor] = useState<"w" | "b">("w"); // default White
+	const [allowUndo, setAllowUndo] = useState(true);
 
 	const getDifficultyLabel = (level: number) => {
 		if (level <= 5) return "Beginner";
@@ -36,7 +40,10 @@ export default function PlayOptions() {
 				{/* Header Section */}
 				<View className="pt-16 pb-8 px-6">
 					<TouchableOpacity
-						onPress={() => router.back()}
+						onPress={() => {
+							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+							router.back();
+						}}
 						className="mb-6 self-start bg-gray-100 dark:bg-gray-800 p-2 rounded-full"
 					>
 						<MaterialCommunityIcons name="arrow-left" size={24} color="#666" />
@@ -52,7 +59,7 @@ export default function PlayOptions() {
 				{/* Settings Section */}
 				<View className="px-6">
 					{/* Difficulty Setting */}
-					<View className="mb-8 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl">
+					<View className="mb-4 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl">
 						<View className="flex-row items-center justify-between mb-4">
 							<View className="flex-row items-center">
 								<View className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-xl mr-3">
@@ -85,14 +92,43 @@ export default function PlayOptions() {
 						</View>
 					</View>
 
+					{/* Allow Undo Option */}
+					<View className="mb-4 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl flex-row items-center justify-between">
+						<View className="flex-row items-center">
+							<View className="bg-orange-100 dark:bg-orange-900/50 p-2 rounded-xl mr-3">
+								<MaterialCommunityIcons name="undo" size={24} color="#f97316" />
+							</View>
+							<View>
+								<Text className="text-lg font-semibold text-gray-900 dark:text-white">
+									Allow Undo
+								</Text>
+								<Text className="text-sm text-gray-500 dark:text-gray-400">
+									Enable taking back moves
+								</Text>
+							</View>
+						</View>
+						<Switch
+							value={allowUndo}
+							onValueChange={(val) => {
+								Haptics.selectionAsync();
+								setAllowUndo(val);
+							}}
+							trackColor={{ false: "#767577", true: "#818cf8" }}
+							thumbColor={allowUndo ? "#4f46e5" : "#f4f3f4"}
+						/>
+					</View>
+
 					{/* Player Color Selection */}
-					<View className="mb-8">
+					<View className="mb-4">
 						<Text className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
 							Play As
 						</Text>
 						<View className="flex-row gap-4">
 							<TouchableOpacity
-								onPress={() => setPlayerColor("w")}
+								onPress={() => {
+									Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+									setPlayerColor("w");
+								}}
 								className={`flex-1 items-center py-5 rounded-2xl border-2 ${
 									playerColor === "w"
 										? "bg-white dark:bg-gray-800 border-indigo-500"
@@ -122,7 +158,10 @@ export default function PlayOptions() {
 							</TouchableOpacity>
 
 							<TouchableOpacity
-								onPress={() => setPlayerColor("b")}
+								onPress={() => {
+									Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+									setPlayerColor("b");
+								}}
 								className={`flex-1 items-center py-5 rounded-2xl border-2 ${
 									playerColor === "b"
 										? "bg-gray-900 dark:bg-gray-700 border-indigo-500"
@@ -154,18 +193,24 @@ export default function PlayOptions() {
 					</View>
 
 					{/* Start Game Button */}
-					<TouchableOpacity
-						className="rounded-2xl py-5 mt-4"
-						style={{ backgroundColor: "#4f46e5" }}
-						onPress={() =>
+					<PressableScale
+						style={{
+							backgroundColor: "#4f46e5",
+							marginTop: 16,
+							paddingVertical: 16,
+							borderRadius: 12,
+						}}
+						onPress={() => {
+							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 							router.push({
 								pathname: "/offline-game",
 								params: {
 									levelSelected: difficulty,
 									playerColor: playerColor,
+									allowUndo: allowUndo ? "true" : "false",
 								},
-							})
-						}
+							});
+						}}
 					>
 						<View className="flex-row items-center justify-center">
 							<MaterialCommunityIcons name="play" size={24} color="white" />
@@ -173,7 +218,7 @@ export default function PlayOptions() {
 								Start Game
 							</Text>
 						</View>
-					</TouchableOpacity>
+					</PressableScale>
 				</View>
 			</ScrollView>
 		</ThemedView>

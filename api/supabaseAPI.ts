@@ -23,7 +23,13 @@ export interface CreateInviteResult {
 export const fetchUserGames = async (userId: string) => {
 	const { data, error } = await supabase
 		.from("games")
-		.select("*")
+		.select(
+			`
+			*,
+			white_player:profiles!white_player_id(username, avatar_url),
+			black_player:profiles!black_player_id(username, avatar_url)
+		`
+		)
 		.or(`white_player_id.eq.${userId},black_player_id.eq.${userId}`)
 		.order("created_at", { ascending: false });
 

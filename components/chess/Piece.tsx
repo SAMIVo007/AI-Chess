@@ -50,11 +50,11 @@ export default React.memo(function Piece({
 	useEffect(() => {
 		if (isSelected) {
 			scale.value = withSequence(
-				withTiming(1.2, { duration: 150 }),
-				withTiming(1, { duration: 150 })
+				withTiming(1.2, { duration: 100 }),
+				withSpring(1, { damping: 50 })
 			);
 		} else {
-			scale.value = withTiming(1, { duration: 150 });
+			scale.value = withTiming(1, { duration: 100 });
 		}
 	}, [isSelected, scale]);
 

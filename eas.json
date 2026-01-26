@@ -1,21 +1,33 @@
 {
-  "cli": {
-    "version": ">= 16.7.2",
-    "appVersionSource": "remote"
-  },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
-    },
-    "preview": {
-      "distribution": "internal"
-    },
-    "production": {
-      "autoIncrement": true
-    }
-  },
-  "submit": {
-    "production": {}
-  }
+	"cli": {
+		"version": ">= 16.7.2",
+		"appVersionSource": "remote"
+	},
+	"build": {
+		"development": {
+			"developmentClient": true,
+			"distribution": "internal",
+			"env": {
+				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1064760270230-r4lftn7vg0dtijb61l60iqm2f066hu1e.apps.googleusercontent.com",
+				"EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "1064760270230-pm61vu6hevtd4ect0nfqs2or4jcgjlbm.apps.googleusercontent.com"
+			}
+		},
+		"preview": {
+			"distribution": "internal",
+			"env": {
+				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1064760270230-r4lftn7vg0dtijb61l60iqm2f066hu1e.apps.googleusercontent.com",
+				"EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "1064760270230-pm61vu6hevtd4ect0nfqs2or4jcgjlbm.apps.googleusercontent.com"
+			}
+		},
+		"production": {
+			"autoIncrement": true,
+			"env": {
+				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1064760270230-r4lftn7vg0dtijb61l60iqm2f066hu1e.apps.googleusercontent.com",
+				"EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "1064760270230-pm61vu6hevtd4ect0nfqs2or4jcgjlbm.apps.googleusercontent.com"
+			}
+		}
+	},
+	"submit": {
+		"production": {}
+	}
 }

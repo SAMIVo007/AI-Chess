@@ -95,7 +95,7 @@ const renderSquares = (
 };
 
 const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
-	({ orientation = "w", onMove }, ref) => {
+	({ orientation = "w", onMove, interactive = true }, ref) => {
 		// 1. Initialize the game engine
 		const gameRef = useRef(new Chess());
 		const game = gameRef.current; // Stable reference that persists
@@ -255,6 +255,8 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 		// --- USER INTERACTION HANDLER ---
 		const handleSquarePress = useCallback(
 			(row: number, col: number) => {
+				if (!interactive) return;
+
 				const currentSelected = selectedSquareRef.current;
 
 				// 1. Clicked same square -> Deselect
