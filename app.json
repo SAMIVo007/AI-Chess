@@ -10,7 +10,7 @@
 		"newArchEnabled": true,
 		"ios": {
 			"supportsTablet": true,
-			"bundleIdentifier": "com.samivo.AIChess",
+			"bundleIdentifier": "com.samivo.aichess",
 			"associatedDomains": ["applinks:aichess.app"]
 		},
 		"android": {
@@ -18,7 +18,7 @@
 				"foregroundImage": "./assets/images/AI_Chess_logo.png",
 				"backgroundColor": "#000000"
 			},
-			"package": "com.samivo.AIChess.dev",
+			"package": "com.samivo.aichess",
 			"edgeToEdgeEnabled": true,
 			"intentFilters": [
 				{

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import type { ComponentProps } from "react";
 import {
 	View,
@@ -8,7 +8,11 @@ import {
 	Dimensions,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import {
+	MaterialIcons,
+	FontAwesome5,
+	MaterialCommunityIcons,
+} from "@expo/vector-icons";
 import { ThemedView } from "@/components/ThemedView";
 import { Chess, Move, Square as SquareNotation } from "chess.js";
 import { startEngine, analyzePosition, stopEngine } from "@/utils/ai";
@@ -17,7 +21,8 @@ import { PieceType } from "chess.js";
 import { supabase } from "@/utils/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { isGameActive } from "@/api/supabaseAPI";
-import { ActivityIndicator } from "react-native";
+import { ActivityIndicator, Alert, BackHandler, Pressable } from "react-native";
+import * as Haptics from "expo-haptics";
 import ChessBoard, { ChessBoardRef } from "@/components/chess/ChessBoard";
 import GameOverModal, {
 	GameEndReason,
@@ -26,6 +31,7 @@ import GameOverModal, {
 import { CapturedPieces } from "@/components/chess/CapturedPieces";
 import { Image } from "expo-image";
 import { AiBlurhash, UserBlurhash } from "@/constants/Blurhashes";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
@@ -41,8 +47,11 @@ const getDescriptiveMove = (
 			? (promotionChar as "n" | "b" | "r" | "q")
 			: undefined;
 
+	// Create a temp game to avoid mutating the main instance state/history during analysis
+	const tempGame = new Chess(game.fen());
+
 	// Get piece information before move
-	const piece = game.get(from);
+	const piece = tempGame.get(from);
 	if (!piece) return `Move from ${from.toUpperCase()} to ${to.toUpperCase()}`;
 
 	const pieceNames: Record<string, string> = {
@@ -55,7 +64,7 @@ const getDescriptiveMove = (
 	};
 
 	// Make move temporarily to get full move information
-	const moveInfo = game.move({ from, to, promotion });
+	const moveInfo = tempGame.move({ from, to, promotion });
 
 	if (!moveInfo) {
 		return `Invalid move from ${from.toUpperCase()} to ${to.toUpperCase()}`;
@@ -87,8 +96,8 @@ const getDescriptiveMove = (
 		}
 	}
 
-	// Undo the move we just made for analysis
-	game.undo();
+	// No need to undo on tempGame, it's discarded
+	// game.undo();
 
 	return moveText;
 };
@@ -123,11 +132,14 @@ const getRating = (levelSelected: string): string => {
 export default function GameScreen() {
 	const router = useRouter();
 	const { session, profile } = useAuth();
-	const { levelSelected, timeSelected, playerColor } = useLocalSearchParams<{
-		levelSelected: string;
-		timeSelected: string;
-		playerColor?: "w" | "b";
-	}>();
+	const insets = useSafeAreaInsets();
+	const { levelSelected, timeSelected, playerColor, allowUndo } =
+		useLocalSearchParams<{
+			levelSelected: string;
+			timeSelected: string;
+			playerColor?: "w" | "b";
+			allowUndo?: string;
+		}>();
 
 	console.log("Game params:", { levelSelected, timeSelected, playerColor });
 	console.log("user: ", profile);
@@ -166,7 +178,7 @@ export default function GameScreen() {
 	const timerRef = useRef<number | null>(null); // Keep as number for setInterval ID
 
 	const chessBoardRef = useRef<ChessBoardRef>(null);
-	const listRef = useRef<FlatList<string>>(null);
+	const listRef = useRef<FlatList<any>>(null);
 
 	// Keep a local game instance PURELY for logic/history/validation checks
 	// (Optional, but good for calculating isMyTurn etc without querying child)
@@ -242,10 +254,15 @@ export default function GameScreen() {
 	}, [levelSelected, timeSelected, gameStarted]); // Updated dependencies
 
 	const onMyMove = async (move: Move) => {
+		if (viewingMoveIndex !== null) return; // Block interaction if viewing history
+
 		// This callback fires ONLY when WE make a move on the board
 		// 1. Update Logic Game
 		logicGame.move(move); // Sync local logic
 		setIsMyTurn(false); // Immediate lock
+
+		// Update history state
+		setMoveHistory(logicGame.history());
 
 		// Track captured pieces
 		const history = logicGame.history({ verbose: true });
@@ -262,42 +279,13 @@ export default function GameScreen() {
 
 		// 2. Trigger AI response
 		if (!checkGameOver()) {
-			const level = levelSelected ? parseInt(levelSelected, 10) : 5;
-			await analyzePosition(logicGame.fen(), level);
+			const safeLevel =
+				levelSelected && !isNaN(parseInt(levelSelected, 10))
+					? parseInt(levelSelected, 10)
+					: 5;
+			await analyzePosition(logicGame.fen(), safeLevel);
 		}
 	};
-
-	// const handleUndo = () => {
-	// 	// Undo the last move in the chess.js instance
-	// 	game.undo(); // User's move
-	// 	// If it was AI's turn before user's undo, undo AI's move as well
-	// 	if (
-	// 		game.history().length > 0 &&
-	// 		game.turn() === "b" &&
-	// 		activePlayer === "w"
-	// 	) {
-	// 		game.undo(); // AI's move
-	// 	}
-
-	// 	// Update the FEN state to reflect the new board position
-	// 	setFen(game.fen());
-
-	// 	// Update the history
-	// 	setHistory(game.history());
-
-	// 	// Update the board display
-	// 	if (chessRef.current) {
-	// 		chessRef.current.resetBoard(game.fen());
-	// 	}
-	// 	// After undo, it's current turn's player
-	// 	setActivePlayer(game.turn() as "w" | "b");
-	// 	// If history is empty, game hasn't started
-	// 	if (game.history().length === 0) {
-	// 		setGameStarted(false);
-	// 	}
-	// };
-
-	// Format mm:ss
 
 	const formatTime = (t: number) =>
 		`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(
@@ -331,6 +319,149 @@ export default function GameScreen() {
 		return false;
 	};
 
+	// Navigation & History State
+	const [viewingMoveIndex, setViewingMoveIndex] = useState<number | null>(null); // null = live
+	const [moveHistory, setMoveHistory] = useState<string[]>([]); // SAN moves for display
+
+	const moveHistoryArray = useMemo(
+		() =>
+			moveHistory.length > 0
+				? Array.from({ length: Math.ceil(moveHistory.length / 2) }, (_, i) => {
+						const moveIndex = i * 2;
+						return {
+							turnNumber: i + 1,
+							white: moveHistory[moveIndex],
+							black: moveHistory[moveIndex + 1] || "",
+							wIndex: moveIndex,
+							bIndex: moveIndex + 1,
+						};
+				  })
+				: [],
+		[moveHistory]
+	);
+
+	const handleResign = () => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+		Alert.alert(
+			"Resign Game",
+			"Are you sure you want to resign? This will count as a loss.",
+			[
+				{ text: "Cancel", style: "cancel" },
+				{
+					text: "Resign",
+					style: "destructive",
+					onPress: async () => {
+						setGameOver({
+							over: true,
+							reason: "resignation",
+							winner: isPlayerWhite ? "b" : "w",
+						});
+						setIsModalVisible(true);
+					},
+				},
+			]
+		);
+	};
+
+	const handleNavigation = (
+		action: "start" | "prev" | "next" | "end" | "view",
+		index?: number
+	) => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+		if (moveHistory.length === 0) return;
+
+		let newIndex = viewingMoveIndex;
+
+		if (action === "view" && typeof index === "number") {
+			newIndex = index;
+		} else if (action === "end") {
+			newIndex = null;
+		} else if (action === "start") {
+			newIndex = -1; // Before first move
+		} else if (action === "prev") {
+			if (newIndex === null) {
+				newIndex = moveHistory.length - 1; // Start at last move
+			} else {
+				newIndex = Math.max(-1, newIndex - 1);
+			}
+		} else if (action === "next") {
+			if (newIndex === null) return; // Already live
+			if (newIndex === moveHistory.length - 1) {
+				newIndex = null; // Go back to live
+			} else {
+				newIndex = newIndex + 1;
+			}
+		}
+
+		setViewingMoveIndex(newIndex);
+
+		// Synchronize Board with TEMP instance
+		const tempGame = new Chess();
+		if (newIndex === null) {
+			// Restore live
+			chessBoardRef.current?.reset(logicGame.fen());
+		} else if (newIndex === -1) {
+			// Start pos
+			chessBoardRef.current?.reset(tempGame.fen());
+		} else {
+			// Replay moves
+			for (let i = 0; i <= newIndex; i++) {
+				tempGame.move(moveHistory[i]);
+			}
+			chessBoardRef.current?.reset(tempGame.fen());
+		}
+	};
+
+	const handleUndo = () => {
+		Haptics.selectionAsync();
+		if (viewingMoveIndex !== null) return; // Can't undo while viewing history
+		if (logicGame.history().length === 0) return;
+
+		// 1. Undo AI move (if exist)
+		// 2. Undo My move
+		// Wait, if it is my turn, it means AI just moved?
+		// No, if isMyTurn is true, it means I am about to move. Last move was AI.
+		// So undo AI move, then Undo my move.
+		// If isMyTurn is false (AI thinking), we shouldn't allow undo ideally, or we interrupt AI?
+		// Logic:
+		// Undo twice to get back to "My Turn".
+
+		// Check if it's currently my turn
+		if (isMyTurn) {
+			// Undo AI's move (last move)
+			logicGame.undo();
+			// Undo My move (move before that)
+			logicGame.undo();
+		} else {
+			// If AI is thinking, we might be in trouble state-wise if we just undo.
+			// Ideally disable Undo while AI is thinking.
+			return;
+		}
+
+		// Update Board
+		chessBoardRef.current?.reset(logicGame.fen());
+
+		// Update History
+		const h = logicGame.history();
+		setMoveHistory(h);
+
+		// Update Captures - need to recalculate from scratch is safest
+		const history = logicGame.history({ verbose: true });
+		const w: PieceType[] = [];
+		const b: PieceType[] = [];
+		history.forEach((m) => {
+			if (m.captured) {
+				if (m.color === "w") w.push(m.captured);
+				else b.push(m.captured);
+			}
+		});
+		setCapturedByWhite(w);
+		setCapturedByBlack(b);
+
+		// Reset active player to me
+		setActivePlayer(isPlayerWhite ? "w" : "b");
+	};
+
 	// stockfish initialization
 	useEffect(() => {
 		const initializeGame = async () => {
@@ -354,11 +485,22 @@ export default function GameScreen() {
 						const moveDescription = getDescriptiveMove(logicGame, uci);
 						console.log("AI Move Description:", moveDescription);
 
-						// Then animate and apply the move
+						// Validate move logic first (prevent applying stale/illegal moves)
+						// This returns the move object if valid, or null if invalid
+						const validMove = logicGame.move({ from, to, promotion });
+
+						if (!validMove) {
+							console.warn("Received invalid/stale move from AI:", uci);
+							// Sync board to ensure visual consistency
+							chessBoardRef.current.reset(logicGame.fen());
+							return;
+						}
+
+						// If valid, Proceed with visual move
 						chessBoardRef.current.move(from, to, promotion);
 
-						// Also update the game state
-						logicGame.move({ from, to, promotion });
+						// Update history state (CRITICAL FIX)
+						setMoveHistory(logicGame.history());
 
 						// Track captures
 						const history = logicGame.history({ verbose: true });
@@ -427,8 +569,14 @@ export default function GameScreen() {
 			// Stockfish defaults to analyzing current position.
 			// Current position is startpos. White to move.
 			// So yes, just trigger analyze.
-			const level = levelSelected ? parseInt(levelSelected, 10) : 5;
-			analyzePosition(logicGame.fen(), level);
+			// So yes, just trigger analyze.
+			const safeLevel =
+				levelSelected && !isNaN(parseInt(levelSelected, 10))
+					? parseInt(levelSelected, 10)
+					: 5;
+			setTimeout(() => {
+				analyzePosition(logicGame.fen(), safeLevel);
+			}, 500);
 		} else {
 			setIsMyTurn(true);
 		}
@@ -440,12 +588,96 @@ export default function GameScreen() {
 	// 	}
 	// }, [history]);
 
+	// Reset game state for rematch
+	const resetGame = () => {
+		// Reset logic game
+		logicGame.reset();
+
+		// Reset visual board
+		chessBoardRef.current?.reset();
+
+		// Reset captured pieces
+		setCapturedByWhite([]);
+		setCapturedByBlack([]);
+		setMoveHistory([]); // Reset history
+
+		// Reset game status
+		setGameOver({ over: false, reason: "checkmate", winner: null });
+		setIsModalVisible(false);
+		setGameStarted(false);
+
+		// Reset Clocks
+		const timeInSeconds = timeSelected ? parseInt(timeSelected, 10) : 300;
+		setWhiteTime(timeInSeconds);
+		setBlackTime(timeInSeconds);
+		setActivePlayer("w");
+
+		// Handle turn reset
+		if (playerColor === "b") {
+			// AI (White) moves first
+			setIsMyTurn(false);
+			const level = levelSelected ? parseInt(levelSelected, 10) : 5;
+			setTimeout(() => {
+				analyzePosition(logicGame.fen(), level);
+			}, 500); // Small delay to ensure UI is ready
+		} else {
+			setIsMyTurn(true);
+		}
+	};
+
+	const handleBack = () => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+		if (gameStarted) {
+			Alert.alert(
+				"Game in Progress",
+				"This game will continue in the background. You can return to it from the Home screen at any time.",
+				[
+					{
+						text: "Cancel",
+						style: "cancel",
+					},
+					{
+						text: "Leave Game",
+						style: "destructive",
+						onPress: () => router.back(),
+					},
+				]
+			);
+		} else {
+			router.back();
+		}
+	};
+
+	// Handle hardware back button (Android)
+	useEffect(() => {
+		const backAction = () => {
+			if (gameStarted) {
+				handleBack();
+				return true; // Prevent default behavior
+			}
+			return false;
+		};
+
+		const backHandler = BackHandler.addEventListener(
+			"hardwareBackPress",
+			backAction
+		);
+
+		return () => backHandler.remove();
+	}, [gameStarted]);
+
 	return (
-		<ThemedView className="flex-1 bg-gray-50 dark:bg-black">
+		<ThemedView
+			className="flex-1 bg-gray-50 dark:bg-black"
+			style={{ paddingTop: insets.top }}
+		>
 			{/* Top Bar */}
-			<View className="flex-row items-center justify-between px-4 pt-12 pb-4">
-				<TouchableOpacity onPress={() => router.back()} className="p-2">
-					<MaterialIcons name="arrow-back-ios" size={24} color="lightgray" />
+			<View className="flex-row items-center justify-between px-4 pt-3 pb-4">
+				<TouchableOpacity
+					onPress={handleBack}
+					className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center"
+				>
+					<MaterialIcons name="arrow-back-ios-new" size={20} color="gray" />
 				</TouchableOpacity>
 				<Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">
 					{!!timeSelected ? "Time Attack" : "Unlimited Time"}
@@ -458,7 +690,7 @@ export default function GameScreen() {
 			{/* Players & Clocks */}
 			<View className="flex-1 justify-center px-4 w-full max-w-[500px] self-center">
 				{/* Opponent (Top) */}
-				<View className="flex-row items-center justify-between mb-6">
+				<View className="flex-row items-center justify-between mb-8">
 					<View className="flex-row items-center">
 						<View className="rounded-full w-14 h-14 mr-3 border border-gray-300 dark:border-gray-600 justify-center items-center overflow-hidden">
 							<Image
@@ -507,11 +739,12 @@ export default function GameScreen() {
 						ref={chessBoardRef}
 						orientation={isPlayerWhite ? "w" : "b"}
 						onMove={onMyMove}
+						interactive={viewingMoveIndex === null}
 					/>
 				</View>
 
 				{/* Player (Bottom) */}
-				<View className="flex-row items-center justify-between mt-6">
+				<View className="flex-row items-center justify-between mt-8">
 					<View className="flex-row items-center">
 						<View className="rounded-full w-14 h-14 mr-3 border border-gray-300 dark:border-gray-600 justify-center items-center overflow-hidden">
 							{profile?.avatar_url ? (
@@ -559,61 +792,187 @@ export default function GameScreen() {
 				</View>
 			</View>
 
-			{/* Move List */}
-			{/* <View className="py-2 h-[4.6rem] border-t border-gray-200 dark:border-gray-700">
-				<Text className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 pl-4">
-					Moves
-				</Text>
+			{/* Move History Strip */}
+			<View className="h-12 bg-white dark:bg-black/40 border-t border-gray-200 dark:border-gray-800">
 				<FlatList
 					ref={listRef}
-					data={history}
+					data={moveHistoryArray}
 					horizontal
-					renderItem={({ item, index }) => (
-						<View
-							key={index}
-							className={`px-2 py-1 rounded ${
-								index % 2 === 0
-									? "bg-gray-100 dark:bg-gray-700"
-									: "bg-white dark:bg-gray-800"
-							} mr-2`}
-						>
-							<Text className="text-sm text-gray-800 dark:text-gray-200">
-								{index + 1}. {item}
-							</Text>
-						</View>
-					)}
-					contentContainerClassName="px-4"
-					keyExtractor={(_, i) => String(i)}
 					showsHorizontalScrollIndicator={false}
-					onContentSizeChange={() =>
-						listRef.current?.scrollToEnd({ animated: true })
-					}
-					getItemLayout={
-						(data, index) =>
-							// Assuming each item has roughly the same width for horizontal list
-							// You'll need to estimate or calculate itemWidth + marginRight
-							({ length: 100, offset: 100 * index, index }) // Replace 100 with actual item width + margin
-					}
+					contentContainerStyle={{ paddingHorizontal: 16, alignItems: "center" }}
+					keyExtractor={(item) => item.turnNumber.toString()}
+					renderItem={({ item }) => {
+						const isWhiteSelected = viewingMoveIndex === item.wIndex;
+						const isBlackSelected = viewingMoveIndex === item.bIndex;
+
+						return (
+							<View className="flex-row items-center mr-4">
+								<Text className="text-gray-500 dark:text-gray-500 font-mono mr-2 text-xs">
+									{item.turnNumber}.
+								</Text>
+								<TouchableOpacity
+									onPress={() => handleNavigation("view", item.wIndex)}
+									className={`px-2 py-1 rounded ${
+										isWhiteSelected
+											? "bg-indigo-500"
+											: "bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800"
+									}`}
+								>
+									<Text
+										className={`${
+											isWhiteSelected
+												? "text-white font-bold"
+												: "text-gray-800 dark:text-gray-200"
+										} text-sm font-medium`}
+									>
+										{item.white}
+									</Text>
+								</TouchableOpacity>
+								{item.black ? (
+									<TouchableOpacity
+										onPress={() => handleNavigation("view", item.bIndex)}
+										className={`px-2 py-1 rounded ml-1 ${
+											isBlackSelected
+												? "bg-indigo-500"
+												: "bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800"
+										}`}
+									>
+										<Text
+											className={`${
+												isBlackSelected
+													? "text-white font-bold"
+													: "text-gray-800 dark:text-gray-200"
+											} text-sm font-medium`}
+										>
+											{item.black}
+										</Text>
+									</TouchableOpacity>
+								) : null}
+							</View>
+						);
+					}}
+					onContentSizeChange={() => {
+						if (viewingMoveIndex === null) {
+							listRef.current?.scrollToEnd({ animated: true });
+						}
+					}}
 				/>
-			</View> */}
+			</View>
 
 			{/* Bottom Controls */}
-			<View className="flex-row justify-around items-center py-3 border-t border-gray-200 dark:border-gray-700">
-				<TouchableOpacity onPress={() => setVoiceOn((v) => !v)} className="p-2">
-					<FontAwesome5
-						name={voiceOn ? "volume-up" : "volume-mute"}
-						size={24}
-						color={voiceOn ? "#4caf50" : "#999"}
-					/>
-				</TouchableOpacity>
+			<View className="flex-row items-center justify-between px-6 py-4 pb-8 bg-white/10 dark:bg-black/20 border-t border-gray-200 dark:border-gray-800">
+				<View className="flex-row items-center gap-2">
+					{/* Undo Button (Start) - Only if enabled */}
+					{allowUndo === "true" && (
+						<Pressable
+							onPress={handleUndo}
+							disabled={
+								!isMyTurn || moveHistory.length === 0 || viewingMoveIndex !== null
+							}
+							className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center mr-2 overflow-hidden"
+							android_ripple={{ color: "#7576a8ff", foreground: true }}
+						>
+							<MaterialCommunityIcons
+								name="undo-variant"
+								size={20}
+								color={
+									!isMyTurn || moveHistory.length === 0 || viewingMoveIndex !== null
+										? "gray"
+										: "#6366f1"
+								}
+							/>
+						</Pressable>
+					)}
 
-				{/* <TouchableOpacity className="p-2" onPress={handleUndo}>
-							<MaterialIcons name="undo" size={28} color="lightgray" />
-						</TouchableOpacity> */}
+					{/* Resign Button */}
+					<Pressable
+						onPress={handleResign}
+						className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 items-center justify-center overflow-hidden"
+						disabled={gameOver.over}
+						android_ripple={{ color: "#996e6eff", foreground: true }}
+					>
+						<MaterialIcons
+							name="flag"
+							size={24}
+							color={gameOver.over ? "gray" : "#ef4444"}
+						/>
+					</Pressable>
 
-				<TouchableOpacity className="p-2">
-					<MaterialIcons name="flag" size={28} color="#e53935" />
-				</TouchableOpacity>
+					{/* Voice Button */}
+					<Pressable
+						onPress={() => {
+							Haptics.selectionAsync();
+							setVoiceOn((v) => !v);
+						}}
+						className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center mx-2 overflow-hidden"
+						android_ripple={{ color: "#7576a8ff", foreground: true }}
+					>
+						<MaterialCommunityIcons
+							name={voiceOn ? "account-voice" : "microphone-off"}
+							size={24}
+							color={voiceOn ? "#4caf50" : "#999"}
+						/>
+					</Pressable>
+				</View>
+
+				{/* Navigation Controls */}
+				<View className="flex-row items-center gap- bg-gray-100 dark:bg-gray-800/50 rounded-2xl">
+					<Pressable
+						onPress={() => handleNavigation("start")}
+						disabled={moveHistory.length === 0}
+						style={{ borderRadius: 14, overflow: "hidden", padding: 8 }}
+						android_ripple={{ color: "#7576a8ff", foreground: true }}
+						hitSlop={10}
+					>
+						<MaterialIcons
+							name="first-page"
+							size={28}
+							color={moveHistory.length === 0 ? "gray" : "#6366f1"}
+						/>
+					</Pressable>
+
+					<Pressable
+						onPress={() => handleNavigation("prev")}
+						disabled={moveHistory.length === 0}
+						style={{ borderRadius: 14, overflow: "hidden", padding: 8 }}
+						android_ripple={{ color: "#7576a8ff", foreground: true }}
+						hitSlop={10}
+					>
+						<MaterialIcons
+							name="chevron-left"
+							size={28}
+							color={moveHistory.length === 0 ? "gray" : "#6366f1"}
+						/>
+					</Pressable>
+
+					<Pressable
+						onPress={() => handleNavigation("next")}
+						disabled={viewingMoveIndex === null}
+						style={{ borderRadius: 14, overflow: "hidden", padding: 8 }}
+						android_ripple={{ color: "#7576a8ff", foreground: true }}
+						hitSlop={10}
+					>
+						<MaterialIcons
+							name="chevron-right"
+							size={28}
+							color={viewingMoveIndex === null ? "gray" : "#6366f1"}
+						/>
+					</Pressable>
+
+					<Pressable
+						onPress={() => handleNavigation("end")}
+						disabled={viewingMoveIndex === null}
+						style={{ borderRadius: 14, overflow: "hidden", padding: 8 }}
+						android_ripple={{ color: "#7576a8ff", foreground: true }}
+						hitSlop={10}
+					>
+						<MaterialIcons
+							name="last-page"
+							size={28}
+							color={viewingMoveIndex === null ? "gray" : "#6366f1"}
+						/>
+					</Pressable>
+				</View>
 			</View>
 
 			{/* Game Over Overlay */}
@@ -628,17 +987,7 @@ export default function GameScreen() {
 				}
 				reason={gameOver.reason}
 				playerColor={isPlayerWhite ? "w" : "b"}
-				onRematch={() => {
-					setIsModalVisible(false);
-					router.replace({
-						pathname: "/offline-game",
-						params: {
-							levelSelected: levelSelected,
-							playerColor: playerColor,
-							timeSelected: timeSelected,
-						},
-					});
-				}}
+				onRematch={resetGame}
 				onNewGame={() => {
 					setIsModalVisible(false);
 					router.replace("/play-options");

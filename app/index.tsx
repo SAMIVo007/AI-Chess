@@ -1,14 +1,24 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, Dimensions, Image } from "react-native";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { View, Text, TouchableOpacity, Dimensions } from "react-native";
+import { Image } from "expo-image";
+import {
+	Feather,
+	FontAwesome5,
+	MaterialCommunityIcons,
+} from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { ThemedText } from "@/components/ThemedText";
 import ParallaxScrollView from "@/components/ParallaxScrollView";
 import { useAuth } from "@/context/AuthContext";
 import RecentGamesList from "@/components/RecentGamesList";
+import { ActionCard } from "@/components/ActionCard";
+import { UserBlurhash } from "@/constants/Blurhashes";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 
 export default function HomeScreen() {
 	const router = useRouter();
+	const insets = useSafeAreaInsets();
 	const { session, profile } = useAuth();
 	const [greeting, setGreeting] = useState("");
 
@@ -19,42 +29,11 @@ export default function HomeScreen() {
 		else setGreeting("Good Evening");
 	}, []);
 
-	const ActionCard = ({
-		title,
-		subtitle,
-		icon,
-		color,
-		onPress,
-	}: {
-		title: string;
-		subtitle: string;
-		icon: any;
-		color: string;
-		onPress: () => void;
-	}) => (
-		<TouchableOpacity
-			onPress={onPress}
-			activeOpacity={0.9}
-			className="mb-4 rounded-3xl overflow-hidden shadow-sm"
-			style={{ backgroundColor: color, height: 140 }}
-		>
-			<View className="absolute right-0 bottom-0 opacity-20 transform translate-x-4 translate-y-4">
-				<MaterialCommunityIcons name={icon} size={120} color="white" />
-			</View>
-			<View className="p-6 h-full justify-between">
-				<View className="bg-white/20 self-start p-3 rounded-2xl">
-					<MaterialCommunityIcons name={icon} size={24} color="white" />
-				</View>
-				<View>
-					<Text className="text-white text-2xl font-bold font-sans">{title}</Text>
-					<Text className="text-white/80 font-medium">{subtitle}</Text>
-				</View>
-			</View>
-		</TouchableOpacity>
-	);
-
 	const headerImage = (
-		<View className="flex-1 bg-[#121212] pt-20 px-6 justify-end pb-4">
+		<View
+			className="flex-1 bg-[#121212] px-6 justify-end pb-4"
+			style={{ paddingTop: insets.top + 70 }}
+		>
 			<View className="flex-row items-center justify-between mb-4">
 				<View>
 					<Text className="text-gray-400 font-medium text-sm uppercase tracking-wider mb-1">
@@ -62,12 +41,31 @@ export default function HomeScreen() {
 					</Text>
 					<Text className="text-white text-3xl font-bold">
 						{profile?.username ||
+							profile?.full_name ||
 							session?.user?.email?.split("@")[0] ||
 							"Chess Master"}
 					</Text>
 				</View>
-				<TouchableOpacity className="bg-gray-800 p-2 rounded-full border border-gray-700">
-					<Feather name="bell" size={24} color="#fff" />
+				<TouchableOpacity
+					className="bg-gray-800 rounded-full border border-gray-700"
+					onPress={() => {
+						Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+						router.push("/account");
+					}}
+				>
+					<View className="w-14 h-14 rounded-full border border-gray-200 dark:border-gray-700 overflow-hidden items-center justify-center">
+						{profile?.avatar_url ? (
+							<Image
+								source={{ uri: profile.avatar_url }}
+								style={{ width: "100%", height: "100%" }}
+								placeholder={{ blurhash: UserBlurhash }}
+								transition={200}
+								contentFit="cover"
+							/>
+						) : (
+							<FontAwesome5 name="user" size={20} color="#9ca3af" />
+						)}
+					</View>
 				</TouchableOpacity>
 			</View>
 
@@ -88,7 +86,10 @@ export default function HomeScreen() {
 				subtitle="Challenge Stockfish"
 				icon="robot"
 				color="#4f46e5" // Indigo 600
-				onPress={() => router.push("/play-options")}
+				onPress={() => {
+					Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+					router.push("/play-options");
+				}}
 			/>
 
 			<ActionCard
@@ -96,7 +97,10 @@ export default function HomeScreen() {
 				subtitle="Challenge Friends"
 				icon="earth"
 				color="#059669" // Emerald 600
-				onPress={() => router.push("/challenge-friends")}
+				onPress={() => {
+					Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+					router.push("/challenge-friends");
+				}}
 			/>
 		</View>
 	);
@@ -107,8 +111,6 @@ export default function HomeScreen() {
 			headerBackgroundColor={{ dark: "#121212", light: "#121212" }}
 		>
 			<View className="flex-1 px-5 rounded-t-[32px] min-h-screen">
-			
-
 				<RecentGamesList />
 
 				{/* Bottom spacer */}

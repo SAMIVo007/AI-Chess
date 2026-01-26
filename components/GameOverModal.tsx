@@ -11,6 +11,7 @@ import Animated, {
 	FadeIn,
 } from "react-native-reanimated";
 import { router } from "expo-router";
+import * as Haptics from "expo-haptics";
 
 export type GameEndReason =
 	| "checkmate"
@@ -103,6 +104,13 @@ export default function GameOverModal({
 
 	useEffect(() => {
 		if (isOpen) {
+			if (result === "win") {
+				Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+			} else if (result === "loss") {
+				Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+			} else {
+				Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+			}
 			// Reset and animate in
 			containerScale.value = 0.9;
 			containerOpacity.value = 0;
@@ -110,10 +118,10 @@ export default function GameOverModal({
 			iconRotation.value = -10;
 
 			containerOpacity.value = withTiming(1, { duration: 300 });
-			containerScale.value = withSpring(1, { damping: 15 });
+			containerScale.value = withSpring(1, { damping: 50 });
 
 			// Icon entrance animation
-			iconScale.value = withDelay(200, withSpring(1, { damping: 10 }));
+			iconScale.value = withDelay(200, withSpring(1, { damping: 50 }));
 			iconRotation.value = withDelay(
 				200,
 				withSequence(
@@ -150,7 +158,13 @@ export default function GameOverModal({
 			<View style={styles.overlay}>
 				<Animated.View style={[styles.container, containerStyle]}>
 					{/* Close Button */}
-					<TouchableOpacity style={styles.closeButton} onPress={onClose}>
+					<TouchableOpacity
+						style={styles.closeButton}
+						onPress={() => {
+							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+							onClose();
+						}}
+					>
 						<MaterialCommunityIcons name="close" size={24} color="#71717a" />
 					</TouchableOpacity>
 
@@ -188,7 +202,7 @@ export default function GameOverModal({
 							entering={FadeIn.delay(500).duration(300)}
 							style={styles.playerInfo}
 						>
-							<View style={styles.playerBadge}> 
+							<View style={styles.playerBadge}>
 								<FontAwesome5
 									name="chess-pawn"
 									size={14}
@@ -211,8 +225,11 @@ export default function GameOverModal({
 					>
 						<TouchableOpacity
 							style={styles.primaryButton}
-							onPress={onRematch}
-							activeOpacity={0.8}
+							onPress={() => {
+								Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+								onRematch();
+							}}
+							activeOpacity={0.5}
 						>
 							<MaterialCommunityIcons name="replay" size={20} color="white" />
 							<Text style={styles.primaryButtonText}>Rematch</Text>
@@ -220,8 +237,11 @@ export default function GameOverModal({
 
 						<TouchableOpacity
 							style={styles.secondaryButton}
-							onPress={onNewGame}
-							activeOpacity={0.8}
+							onPress={() => {
+								Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+								onNewGame();
+							}}
+							activeOpacity={0.5}
 						>
 							<MaterialCommunityIcons name="chess-knight" size={20} color="#a1a1aa" />
 							<Text style={styles.secondaryButtonText}>New Game</Text>
@@ -229,7 +249,10 @@ export default function GameOverModal({
 
 						<TouchableOpacity
 							style={styles.textButton}
-							onPress={() => router.replace("/")}
+							onPress={() => {
+								Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+								router.replace("/");
+							}}
 						>
 							<Text style={styles.textButtonText}>Exit to Home</Text>
 						</TouchableOpacity>

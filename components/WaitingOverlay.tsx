@@ -20,6 +20,7 @@ import Animated, {
 	withDelay,
 	SharedValue,
 } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 
 interface WaitingOverlayProps {
 	inviteCode?: string;
@@ -82,6 +83,7 @@ export const WaitingOverlay = ({
 	const router = useRouter();
 
 	const handleShare = async () => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 		if (inviteCode) {
 			await Share.share({
 				message: `🏁 Join my chess game! \n\n🔗 Link: aichess://join/${inviteCode}\n📱 Code: ${inviteCode}`,
@@ -90,6 +92,7 @@ export const WaitingOverlay = ({
 	};
 
 	const handleCopy = async () => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid);
 		if (inviteCode) {
 			await Clipboard.setStringAsync(inviteCode);
 			ToastAndroid.show("Invite code copied to clipboard", ToastAndroid.SHORT);

@@ -68,4 +68,5 @@ export interface PieceSelectorProps {
 export interface BoardProps {
 	orientation: PieceColor;
 	onMove?: (move: Move) => void;
+	interactive?: boolean;
 }

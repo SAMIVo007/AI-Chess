@@ -70,42 +70,61 @@ export const AppNavigator = () => {
 	// Handle deep links
 	useEffect(() => {
 		const handleDeepLink = (url: string) => {
-			if (url.includes("access_token") && url.includes("refresh_token")) {
-				const params = new URLSearchParams(url.split("#")[1]);
-				const access_token = params.get("access_token");
-				const refresh_token = params.get("refresh_token");
+			console.log("[DeepLink] Incoming URL:", url);
 
-				if (access_token && refresh_token) {
-					supabase.auth.setSession({
+			// Parse parameters from both fragment (#) and query string (?)
+			// OAuth redirects often put tokens in the fragment.
+			let params = new URLSearchParams();
+
+			if (url.includes("#")) {
+				const fragment = url.split("#")[1];
+				const fragmentParams = new URLSearchParams(fragment);
+				fragmentParams.forEach((val, key) => params.append(key, val));
+			}
+
+			if (url.includes("?")) {
+				const query = url.split("?")[1];
+				const queryParams = new URLSearchParams(query);
+				queryParams.forEach((val, key) => {
+					// Prefer fragment params if duplicates exist (standard OAuth behavior)
+					if (!params.has(key)) params.append(key, val);
+				});
+			}
+
+			const access_token = params.get("access_token");
+			const refresh_token = params.get("refresh_token");
+			const error_description = params.get("error_description");
+			const error_code = params.get("error_code");
+
+			if (access_token && refresh_token) {
+				console.log("[DeepLink] Found session tokens. Setting session...");
+				supabase.auth
+					.setSession({
 						access_token,
 						refresh_token,
+					})
+					.then(({ error }) => {
+						if (error) console.error("[DeepLink] Supabase session error:", error);
+						else console.log("[DeepLink] Session set successfully.");
 					});
-				}
-			} else if (url.includes("error_description")) {
-				const params = new URLSearchParams(url.split("#")[1]);
-				const error_description = params.get("error_description");
-				const error_code = params.get("error_code");
-
-				if (error_description) {
-					const decodedError = decodeURIComponent(
-						error_description.replace(/\+/g, " ")
-					);
-					console.error(`[DeepLink] Error: ${error_code} - ${decodedError}`);
-					Alert.alert("Link Expired or Invalid", decodedError);
-				}
+			} else if (error_description) {
+				const decodedError = decodeURIComponent(
+					error_description.replace(/\+/g, " ")
+				);
+				console.error(`[DeepLink] Auth Error: ${error_code} - ${decodedError}`);
+				Alert.alert("Authentication Error", decodedError);
 			}
 
 			const route = url.replace(/.*?:\/\//g, "");
 
 			// Handle join game links: aichess://join/ABC123
+			// Route '/join-game' was removed. We redirect to 'challenge-friends' or handle appropriately.
+			// For now, let's just log it or redirect to home if no valid route.
 			if (route.startsWith("join/")) {
-				const inviteCode = route.split("/")[1];
-				if (inviteCode) {
-					router.push({
-						pathname: "/join-game",
-						params: { inviteCode },
-					});
-				}
+				console.log(
+					"[DeepLink] Join game link detected but join-game route is missing."
+				);
+				router.push("/challenge-friends");
 			}
 		};
 
@@ -138,7 +157,8 @@ export const AppNavigator = () => {
 	return (
 		<Stack>
 			<Stack.Protected guard={!!session}>
-				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+				<Stack.Screen name="index" options={{ headerShown: false }} />
+				<Stack.Screen name="account" options={{ headerShown: false }} />
 				<Stack.Screen name="offline-game" options={{ headerShown: false }} />
 				<Stack.Screen name="online-game" options={{ headerShown: false }} />
 				<Stack.Screen

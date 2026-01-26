@@ -6,6 +6,8 @@ import { useRouter } from "expo-router";
 import BottomSheet from "@gorhom/bottom-sheet";
 import { JoinGameModal } from "@/components/JoinGameModal";
 import { CreateGameModal } from "@/components/CreateGameModal";
+import { ActionCard } from "@/components/ActionCard";
+import * as Haptics from "expo-haptics";
 
 export default function ChallengeFriends() {
 	const router = useRouter();
@@ -21,40 +23,6 @@ export default function ChallengeFriends() {
 		// console.log("handleSheetChanges", index);
 	}, []);
 
-	const ActionCard = ({
-		title,
-		subtitle,
-		icon,
-		color,
-		onPress,
-	}: {
-		title: string;
-		subtitle: string;
-		icon: any;
-		color: string;
-		onPress: () => void;
-	}) => (
-		<TouchableOpacity
-			onPress={onPress}
-			activeOpacity={0.9}
-			className="mb-4 rounded-3xl overflow-hidden shadow-sm"
-			style={{ backgroundColor: color, height: 140 }}
-		>
-			<View className="absolute right-0 bottom-0 opacity-20 transform translate-x-4 translate-y-4">
-				<MaterialCommunityIcons name={icon} size={120} color="white" />
-			</View>
-			<View className="p-6 h-full justify-between">
-				<View className="bg-white/20 self-start p-3 rounded-2xl">
-					<MaterialCommunityIcons name={icon} size={24} color="white" />
-				</View>
-				<View>
-					<Text className="text-white text-2xl font-bold font-sans">{title}</Text>
-					<Text className="text-white/80 font-medium">{subtitle}</Text>
-				</View>
-			</View>
-		</TouchableOpacity>
-	);
-
 	return (
 		<ThemedView className="flex-1 bg-white dark:bg-[#121212]">
 			<ScrollView
@@ -65,7 +33,10 @@ export default function ChallengeFriends() {
 				{/* Header Section */}
 				<View className="pt-16 pb-8 px-6">
 					<TouchableOpacity
-						onPress={() => router.back()}
+						onPress={() => {
+							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+							router.back();
+						}}
 						className="mb-6 self-start bg-gray-100 dark:bg-gray-800 p-2 rounded-full"
 					>
 						<MaterialCommunityIcons name="arrow-left" size={24} color="#666" />
@@ -86,6 +57,7 @@ export default function ChallengeFriends() {
 						icon="chess-king"
 						color="#ea580c"
 						onPress={() => {
+							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 							setShowCreate(true);
 							createBottomSheetRef.current?.expand();
 						}}
@@ -97,6 +69,7 @@ export default function ChallengeFriends() {
 						icon="login-variant"
 						color="#0891b2"
 						onPress={() => {
+							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 							setShowJoin(true);
 							joinBottomSheetRef.current?.expand();
 						}}
