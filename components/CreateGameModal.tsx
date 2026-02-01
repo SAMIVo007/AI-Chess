@@ -13,7 +13,7 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
-
+import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useAuth } from "@/context/AuthContext";
 import { createGameWithInvite } from "@/api/supabaseAPI";
@@ -22,6 +22,7 @@ import { useThemeColor } from "@/hooks/useThemeColor";
 interface CreateGameModalProps {
 	bottomSheetRef: any;
 	handleSheetChanges: (index: number) => void;
+	onClose: () => void;
 }
 
 type ColorPreference = "white" | "black" | "random";
@@ -29,18 +30,21 @@ type ColorPreference = "white" | "black" | "random";
 export const CreateGameModal = ({
 	bottomSheetRef,
 	handleSheetChanges,
+	onClose,
 }: CreateGameModalProps) => {
 	const router = useRouter();
 	const { session } = useAuth();
 	const [loading, setLoading] = useState(false);
 	const [selectedColor, setSelectedColor] = useState<ColorPreference>("random");
 
-	const snapPoints = useMemo(() => ["45%"], []);
+	const snapPoints = useMemo(() => ["50%"], []);
 
 	const backgroundColor = useThemeColor({}, "background");
 	const textColor = useThemeColor({}, "text");
 
 	const handleCreateGame = async () => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
 		if (!session?.user) {
 			Alert.alert("Error", "You must be logged in to create a game.");
 			return;
@@ -57,23 +61,23 @@ export const CreateGameModal = ({
 				// const webLink = `https://aichess.app/join/${result.inviteCode}`;
 
 				// 1. Close Modal
-				bottomSheetRef.current?.close();
+				onClose();
 
-				// 2. Share
-				const shareResult = await Share.share({
-					message: `🏁 Join my chess game! I'm playing as ${result.playerColor}.\n\n🔗 Link: ${deepLink}\n\n📱 Code: ${result.inviteCode}`,
-					title: "Chess Game Invite",
-					url: deepLink,
-				});
+				// // 2. Share
+				// const shareResult = await Share.share({
+				// 	message: `🏁 Join my chess game! I'm playing as ${result.playerColor}.\n\n🔗 Link: ${deepLink}\n\n📱 Code: ${result.inviteCode}`,
+				// 	title: "Chess Game Invite",
+				// 	url: deepLink,
+				// });
 
 				// 3. Navigate to Game (regardless of share result, so user can wait)
 				// We wait a bit if share is dismissed to ensure smooth transition
 				setTimeout(() => {
 					router.push({
-						pathname: "/game",
-						params: { gameId: result.gameId, vsAI: "false" },
+						pathname: "/online-game",
+						params: { gameId: result.gameId, inviteCode: result.inviteCode },
 					});
-				}, 500);
+				}, 100);
 			}
 		} catch (error) {
 			console.error("Error creating game:", error);
@@ -148,6 +152,7 @@ export const CreateGameModal = ({
 	return (
 		<BottomSheet
 			ref={bottomSheetRef}
+			onClose={onClose}
 			onChange={handleSheetChanges}
 			snapPoints={snapPoints}
 			enablePanDownToClose
@@ -156,7 +161,7 @@ export const CreateGameModal = ({
 			backdropComponent={renderBackdrop}
 			backgroundStyle={{ backgroundColor: backgroundColor }}
 			handleIndicatorStyle={{ backgroundColor: "#9BA1A6" }}
-			index={-1}
+			// index={-1}
 		>
 			<BottomSheetView style={styles.contentContainer}>
 				<View style={styles.header}>

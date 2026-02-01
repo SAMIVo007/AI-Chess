@@ -14,7 +14,7 @@ import BottomSheet, {
 } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-
+import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { useAuth } from "@/context/AuthContext";
 import { joinGameByInvite } from "@/api/supabaseAPI";
@@ -23,11 +23,13 @@ import { useThemeColor } from "@/hooks/useThemeColor";
 interface JoinGameModalProps {
 	bottomSheetRef: any;
 	handleSheetChanges: (index: number) => void;
+	onClose: () => void;
 }
 
 export const JoinGameModal = ({
 	bottomSheetRef,
 	handleSheetChanges,
+	onClose,
 }: JoinGameModalProps) => {
 	const router = useRouter();
 	const { session } = useAuth();
@@ -35,17 +37,19 @@ export const JoinGameModal = ({
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(false);
 
-	const snapPoints = useMemo(() => ["30%"], []);
+	const snapPoints = useMemo(() => ["40%"], []);
 
 	const backgroundColor = useThemeColor({}, "background");
 	const iconColor = useThemeColor({}, "icon");
 	const textColor = useThemeColor({}, "text");
 	const inputBackground = useThemeColor(
-		{ light: "#f0f0f0", dark: "#2C2C2E" },
-		"background"
+		{ light: "#2C2C2E", dark: "#2C2C2E" },
+		"background",
 	);
 
 	const handleJoinGame = async () => {
+		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
 		if (!joinCode.trim()) {
 			setError("Please enter a valid invite code.");
 			return;
@@ -64,10 +68,10 @@ export const JoinGameModal = ({
 		try {
 			const gameId = await joinGameByInvite(joinCode.trim(), session.user.id);
 			if (gameId) {
-				bottomSheetRef.current?.close();
+				onClose();
 				// Move Guest to Game Screen
 				router.push({
-					pathname: "/game",
+					pathname: "/online-game",
 					params: { gameId: gameId },
 				});
 				setJoinCode("");
@@ -95,6 +99,7 @@ export const JoinGameModal = ({
 		<BottomSheet
 			ref={bottomSheetRef}
 			onChange={handleSheetChanges}
+			onClose={onClose}
 			snapPoints={snapPoints}
 			enablePanDownToClose
 			enableBlurKeyboardOnGesture
@@ -102,7 +107,7 @@ export const JoinGameModal = ({
 			backdropComponent={renderBackdrop}
 			backgroundStyle={{ backgroundColor: backgroundColor }}
 			handleIndicatorStyle={{ backgroundColor: "#9BA1A6" }}
-			index={-1}
+			// index={-1}
 		>
 			<BottomSheetView style={styles.contentContainer}>
 				<View style={styles.header}>
@@ -117,7 +122,7 @@ export const JoinGameModal = ({
 						styles.inputContainer,
 						{
 							backgroundColor: inputBackground,
-							borderColor: error ? "red" : "transparent",
+							borderColor: error ? "#EA4335" : "transparent",
 							borderWidth: error ? 1 : 0,
 						},
 					]}
@@ -125,7 +130,7 @@ export const JoinGameModal = ({
 					<Feather
 						name="hash"
 						size={20}
-						color={error ? "red" : iconColor}
+						color={error ? "#EA4335" : iconColor}
 						style={styles.inputIcon}
 					/>
 					<BottomSheetTextInput
@@ -231,10 +236,10 @@ const styles = StyleSheet.create({
 	cancelButtonText: {
 		fontSize: 18,
 		fontWeight: "600",
-		color: "#FF453A", // System red for destructive/cancel actions
+		color: "#EA4335", // System red for destructive/cancel actions
 	},
 	errorText: {
-		color: "#FF453A",
+		color: "#EA4335",
 		fontSize: 14,
 		textAlign: "center",
 		marginBottom: 16,

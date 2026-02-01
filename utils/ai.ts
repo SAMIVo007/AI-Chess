@@ -70,13 +70,17 @@ export async function analyzePosition(
 	console.log(`Analyzing position: ${fen}, level: ${level}`);
 
 	try {
+		// Stop any previous search to prevent race conditions
+		await sendCommand("stop\n");
+		await sendCommand("isready\n");
+
 		const skill = Math.max(0, Math.min(20, level)); // clamp between 0 and 20
 		await sendCommand(`setoption name Skill Level value ${skill}\n`);
 
 		await sendCommand(`position fen ${fen}\n`);
 
-		// Smart thinking time: from 200ms to 3000ms
-		const movetime = 200 + skill * 140;
+		// Smart thinking time: from 100ms to 2100ms (Faster response)
+		const movetime = 100 + skill * 100;
 
 		// Smart depth cap: from 2 to 18
 		const depth = 2 + Math.floor(skill * 0.7);

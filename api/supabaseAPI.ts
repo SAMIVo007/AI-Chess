@@ -20,6 +20,27 @@ export interface CreateInviteResult {
 	expiresAt: string;
 }
 
+export const fetchUserGames = async (userId: string) => {
+	const { data, error } = await supabase
+		.from("games")
+		.select(
+			`
+			*,
+			white_player:profiles!white_player_id(username, avatar_url),
+			black_player:profiles!black_player_id(username, avatar_url)
+		`
+		)
+		.or(`white_player_id.eq.${userId},black_player_id.eq.${userId}`)
+		.order("created_at", { ascending: false });
+
+	if (error) {
+		console.error("Error fetching user games:", error);
+		return [];
+	}
+
+	return data || [];
+};
+
 // Add this cleanup function
 export const cleanupExpiredGames = async () => {
 	try {

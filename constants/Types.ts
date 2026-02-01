@@ -1,3 +1,14 @@
+import { PieceType, PieceColor, SquareColor, Square, Move } from "chess.js";
+
+export type Profile = {
+	id: string;
+	username?: string;
+	avatar_url?: string;
+	full_name?: string;
+};
+
+export type PromotionPieceType = "q" | "r" | "b" | "n";
+
 export interface Friend {
 	id: string;
 	username: string;
@@ -17,7 +28,7 @@ export interface Game {
 	winner_id: string | null;
 	expires_at: string;
 	invite_code: string;
-	turn: "w" | "b";
+	turn: PieceColor;
 }
 
 export interface GameInvite {
@@ -26,4 +37,36 @@ export interface GameInvite {
 	created_at: string;
 	expires_at: string;
 	status: "pending" | "waiting" | "active" | "completed";
+}
+
+export interface SquareProps {
+	color: SquareColor;
+	row: number;
+	col: number;
+	index: number;
+	isSelected?: boolean;
+	isHighlighted?: boolean;
+	isCapture?: boolean;
+	onPress?: (row: number, col: number) => void;
+}
+
+export interface PieceProps {
+	color: PieceColor;
+	type: PieceType;
+	position: Square;
+	row: number;
+	col: number;
+	onPress?: (row: number, col: number) => void;
+	isSelected?: boolean;
+}
+
+export interface PieceSelectorProps {
+	color: PieceColor;
+	onPress?: (type: PromotionPieceType) => void;
+}
+
+export interface BoardProps {
+	orientation: PieceColor;
+	onMove?: (move: Move) => void;
+	interactive?: boolean;
 }
