@@ -43,8 +43,8 @@ export const JoinGameModal = ({
 	const iconColor = useThemeColor({}, "icon");
 	const textColor = useThemeColor({}, "text");
 	const inputBackground = useThemeColor(
-		{ light: "#f0f0f0", dark: "#2C2C2E" },
-		"background"
+		{ light: "#2C2C2E", dark: "#2C2C2E" },
+		"background",
 	);
 
 	const handleJoinGame = async () => {

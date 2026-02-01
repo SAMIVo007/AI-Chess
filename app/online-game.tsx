@@ -10,6 +10,8 @@ import {
 	Alert,
 	BackHandler,
 	Pressable,
+	ToastAndroid,
+	Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { MaterialIcons, FontAwesome5, Ionicons } from "@expo/vector-icons";
@@ -33,7 +35,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const getDescriptiveMove = (
 	game: InstanceType<typeof Chess>,
-	uci: string
+	uci: string,
 ): string => {
 	const from = uci.slice(0, 2) as SquareNotation;
 	const to = uci.slice(2, 4) as SquareNotation;
@@ -98,6 +100,7 @@ const getDescriptiveMove = (
 export default function GameScreen() {
 	const router = useRouter();
 	const { session, profile } = useAuth();
+	const userId = session?.user?.id;
 	const insets = useSafeAreaInsets();
 	const { levelSelected, timeSelected, gameId, inviteCode } =
 		useLocalSearchParams<{
@@ -141,10 +144,10 @@ export default function GameScreen() {
 
 	// Chess clocks with active player tracking
 	const [whiteTime, setWhiteTime] = useState<number | undefined>(
-		timeSelected ? parseInt(timeSelected, 10) : 300
+		timeSelected ? parseInt(timeSelected, 10) : 300,
 	);
 	const [blackTime, setBlackTime] = useState<number | undefined>(
-		timeSelected ? parseInt(timeSelected, 10) : 300
+		timeSelected ? parseInt(timeSelected, 10) : 300,
 	);
 	const [activePlayer, setActivePlayer] = useState<"w" | "b">("w"); // White starts
 	const [gameStarted, setGameStarted] = useState(false);
@@ -157,6 +160,7 @@ export default function GameScreen() {
 
 	// Navigation & History State
 	const [viewingMoveIndex, setViewingMoveIndex] = useState<number | null>(null); // null = live
+	const viewingMoveIndexRef = useRef<number | null>(null);
 	const [moveHistory, setMoveHistory] = useState<string[]>([]); // SAN moves for display
 
 	// Keep a local game instance PURELY for logic/history/validation checks
@@ -168,9 +172,26 @@ export default function GameScreen() {
 		voiceOnRef.current = voiceOn;
 	}, [voiceOn]);
 
-	// Initialize online game and set up real-time subscription
 	useEffect(() => {
-		if (!gameId || !session) return;
+		viewingMoveIndexRef.current = viewingMoveIndex;
+	}, [viewingMoveIndex]);
+
+	useEffect(() => {
+		if (!gameId || !userId) return;
+
+		let isMounted = true;
+
+		const showToast = (message: string) => {
+			if (!isMounted) return;
+			if (Platform.OS === "android") {
+				ToastAndroid.show(message, ToastAndroid.SHORT);
+			} else {
+				// iOS doesn't have a native toast, we could use an Alert or a custom component.
+				// For now, silently log or use Alert (though redundant if connection just hiccups)
+				// Alert.alert("Notice", message);
+				console.log(message);
+			}
+		};
 
 		let channel: ReturnType<typeof supabase.channel> | null = null;
 
@@ -204,6 +225,8 @@ export default function GameScreen() {
 					return;
 				}
 
+				if (!isMounted) return;
+
 				// Store status & date
 				setStatus(gameData.status);
 				if (gameData.created_at) {
@@ -211,7 +234,7 @@ export default function GameScreen() {
 				}
 
 				// Identity
-				const isWhite = gameData.white_player_id === session.user.id;
+				const isWhite = gameData.white_player_id === userId;
 				setIsPlayerWhite(isWhite);
 
 				// Fetch opponent profile if they exist
@@ -220,6 +243,8 @@ export default function GameScreen() {
 				} else if (!isWhite && gameData.white_player_id) {
 					fetchOpponentProfile(gameData.white_player_id);
 				}
+
+				if (!isMounted) return;
 
 				// Load game state if it exists
 				if (gameData.fen) {
@@ -251,7 +276,7 @@ export default function GameScreen() {
 					setIsMyTurn(false);
 				} else {
 					setIsMyTurn(
-						(isWhite && currentTurn === "w") || (!isWhite && currentTurn === "b")
+						(isWhite && currentTurn === "w") || (!isWhite && currentTurn === "b"),
 					);
 				}
 				setActivePlayer(currentTurn as "w" | "b");
@@ -262,6 +287,7 @@ export default function GameScreen() {
 				}
 
 				// Realtime Subscription
+				if (!isMounted) return;
 				console.log(`Subscribing to channel: game-${gameId}`);
 				channel = supabase
 					.channel(`game-${gameId}`)
@@ -274,115 +300,136 @@ export default function GameScreen() {
 							filter: `id=eq.${gameId}`,
 						},
 						(payload) => {
-							console.log("Received Realtime Update:", payload);
-							const newData = payload.new;
+							try {
+								console.log("Received Realtime Update:", payload);
+								const newData = payload.new;
 
-							// 1. Status Update
-							if (newData.status === "active") {
-								setStatus("active");
-								setGameStarted(true);
+								// 1. Status Update
+								if (newData.status === "active") {
+									setStatus("active");
+									setGameStarted(true);
 
-								// Fetch opponent info if we don't have it yet
-								if (isWhite && newData.black_player_id) {
-									fetchOpponentProfile(newData.black_player_id);
-								} else if (!isWhite && newData.white_player_id) {
-									fetchOpponentProfile(newData.white_player_id);
-								}
-							} else if (newData.status === "completed") {
-								setStatus("completed");
-								setGameStarted(false);
-								setIsMyTurn(false);
-
-								const winnerId = newData.winner_id;
-								let winner: "w" | "b" | null = null;
-								if (winnerId) {
-									// If winnerId matches session user?
-									// No, winnerID is the UUID.
-									// We need to map UUID to 'w' or 'b'.
-									// If winnerId == session.user.id => I won.
-									// If I am white, then winner is 'w'.
-									if (winnerId === session.user.id) {
-										winner = isWhite ? "w" : "b";
-									} else {
-										// Opponent won
-										winner = isWhite ? "b" : "w";
+									// Fetch opponent info if we don't have it yet
+									if (isWhite && newData.black_player_id) {
+										fetchOpponentProfile(newData.black_player_id);
+									} else if (!isWhite && newData.white_player_id) {
+										fetchOpponentProfile(newData.white_player_id);
 									}
-								}
+								} else if (newData.status === "completed") {
+									setStatus("completed");
+									setGameStarted(false);
+									setIsMyTurn(false);
 
-								// Check if game is properly over locally?
-								// Use explicit reason if available from DB
-								const resultReason = newData.result_reason as GameEndReason | null;
-
-								if (!logicGame.game_over()) {
-									setGameOver({
-										over: true,
-										reason: resultReason || "resignation",
-										winner,
-									});
-									setIsModalVisible(true);
-								} else {
-									// If logic says game over, we might want to ensure reasons match if needed
-									// But local board state is authoritative for checkmates usually.
-									// However, for draws/stalemates, it's good to sync.
-									// For now, if board is game over, we likely handled it via onMyMove or fen update.
-								}
-							}
-
-							// 2. Handle Moves (Opponent)
-							if (newData.fen !== logicGame.fen()) {
-								console.log("Opponent moved! Updating board...");
-								if (newData.pgn) {
-									logicGame.load_pgn(newData.pgn);
-									const history = logicGame.history({ verbose: true });
-									const sanHistory = logicGame.history();
-									setMoveHistory(sanHistory);
-
-									// If user was viewing live, stay on live (null) logic
-									// If user was viewing history, do nothing (stay on that move)
-									if (viewingMoveIndex === null) {
-										// Ensure visual board is synced if we are live
-										chessBoardRef.current?.reset(newData.fen);
-									}
-
-									const w: PieceType[] = [];
-									const b: PieceType[] = [];
-									history.forEach((m) => {
-										if (m.captured) {
-											if (m.color === "w") w.push(m.captured);
-											else b.push(m.captured);
+									const winnerId = newData.winner_id;
+									let winner: "w" | "b" | null = null;
+									if (winnerId) {
+										// If winnerId matches session user?
+										// No, winnerID is the UUID.
+										// We need to map UUID to 'w' or 'b'.
+										// If winnerId == session.user.id => I won.
+										// If I am white, then winner is 'w'.
+										if (winnerId === userId) {
+											winner = isWhite ? "w" : "b";
+										} else {
+											// Opponent won
+											winner = isWhite ? "b" : "w";
 										}
-									});
-									setCapturedByWhite(w);
-									setCapturedByBlack(b);
+									}
+
+									// Check if game is properly over locally?
+									// Use explicit reason if available from DB
+									const resultReason = newData.result_reason as GameEndReason | null;
+
+									if (!logicGame.game_over()) {
+										setGameOver({
+											over: true,
+											reason: resultReason || "resignation",
+											winner,
+										});
+										setIsModalVisible(true);
+									} else {
+										// If logic says game over, we might want to ensure reasons match if needed
+										// But local board state is authoritative for checkmates usually.
+										// However, for draws/stalemates, it's good to sync.
+										// For now, if board is game over, we likely handled it via onMyMove or fen update.
+									}
 								}
 
-								// Update Turn and Active Player
-								const turn = logicGame.turn();
-								const myTurn = (isWhite && turn === "w") || (!isWhite && turn === "b");
-								setIsMyTurn(myTurn);
-								setActivePlayer(turn as "w" | "b");
+								// 2. Handle Moves (Opponent)
+								if (newData.fen !== logicGame.fen()) {
+									console.log("Opponent moved! Updating board...");
+									if (newData.pgn) {
+										const prevHistoryLength = logicGame.history().length;
+										logicGame.load_pgn(newData.pgn);
+										const history = logicGame.history({ verbose: true });
+										const sanHistory = logicGame.history();
+										setMoveHistory(sanHistory);
 
-								// Check Game Over
-								if (logicGame.game_over()) {
-									let reason: GameEndReason = "checkmate";
-									const winner = logicGame.in_checkmate()
-										? logicGame.turn() === "w"
-											? "b"
-											: "w"
-										: null;
-									if (logicGame.in_stalemate()) reason = "stalemate";
-									else if (logicGame.in_threefold_repetition())
-										reason = "threefold_repetition";
-									else if (logicGame.insufficient_material())
-										reason = "insufficient_material";
-									else if (logicGame.in_draw()) reason = "draw";
-									setGameOver({ over: true, reason, winner });
-									setIsModalVisible(true);
+										// If user was viewing live, stay on live (null) logic
+										// If user was viewing history, do nothing (stay on that move)
+										if (viewingMoveIndexRef.current === null) {
+											// Ensure visual board is synced if we are live
+											// Check if it's a single move we can animate
+											if (history.length === prevHistoryLength + 1) {
+												const lastMove = history[history.length - 1];
+												chessBoardRef.current?.move(
+													lastMove.from,
+													lastMove.to,
+													lastMove.promotion,
+												);
+											} else {
+												// Fallback for multiple moves or complex state changes
+												chessBoardRef.current?.reset(newData.fen);
+											}
+										}
+
+										const w: PieceType[] = [];
+										const b: PieceType[] = [];
+										history.forEach((m) => {
+											if (m.captured) {
+												if (m.color === "w") w.push(m.captured);
+												else b.push(m.captured);
+											}
+										});
+										setCapturedByWhite(w);
+										setCapturedByBlack(b);
+									}
+
+									// Update Turn and Active Player
+									const turn = logicGame.turn();
+									const myTurn = (isWhite && turn === "w") || (!isWhite && turn === "b");
+									setIsMyTurn(myTurn);
+									setActivePlayer(turn as "w" | "b");
+
+									// Check Game Over
+									if (logicGame.game_over()) {
+										let reason: GameEndReason = "checkmate";
+										const winner = logicGame.in_checkmate()
+											? logicGame.turn() === "w"
+												? "b"
+												: "w"
+											: null;
+										if (logicGame.in_stalemate()) reason = "stalemate";
+										else if (logicGame.in_threefold_repetition())
+											reason = "threefold_repetition";
+										else if (logicGame.insufficient_material())
+											reason = "insufficient_material";
+										else if (logicGame.in_draw()) reason = "draw";
+										setGameOver({ over: true, reason, winner });
+										setIsModalVisible(true);
+									}
 								}
+							} catch (err) {
+								console.error("Error processing realtime update:", err);
 							}
-						}
+						},
 					)
-					.subscribe();
+					.subscribe((status) => {
+						console.log(`CHANNEL_STATUS for game-${gameId}:`, status);
+						if (status === "CHANNEL_ERROR") {
+							showToast("Connection Error! Updates may be delayed.");
+						}
+					});
 			} catch (error) {
 				console.error("Error initializing online game:", error);
 			}
@@ -391,12 +438,13 @@ export default function GameScreen() {
 		setupGame();
 
 		return () => {
+			isMounted = false;
 			if (channel) {
 				console.log(`Unsubscribing from channel: game-${gameId}`);
 				supabase.removeChannel(channel);
 			}
 		};
-	}, [gameId, session]);
+	}, [gameId, userId]);
 
 	// Start/stop timer logic
 	useEffect(() => {
@@ -621,14 +669,13 @@ export default function GameScreen() {
 							.eq("id", gameId);
 					},
 				},
-			]
+			],
 		);
 	};
 
-	// Wait, I need to update the signature to support jumping to index.
 	const handleNavigation = (
 		action: "start" | "prev" | "next" | "end" | "view",
-		index?: number
+		index?: number,
 	) => {
 		if (moveHistory.length === 0) return;
 
@@ -686,7 +733,7 @@ export default function GameScreen() {
 	const formatTime = (t: number) =>
 		`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(
 			2,
-			"0"
+			"0",
 		)}`;
 
 	// Called by Board when game ends
@@ -709,7 +756,7 @@ export default function GameScreen() {
 						style: "destructive",
 						onPress: () => router.back(),
 					},
-				]
+				],
 			);
 		} else {
 			router.back();
@@ -728,7 +775,7 @@ export default function GameScreen() {
 
 		const backHandler = BackHandler.addEventListener(
 			"hardwareBackPress",
-			backAction
+			backAction,
 		);
 
 		return () => backHandler.remove();
@@ -736,27 +783,27 @@ export default function GameScreen() {
 
 	return (
 		<ThemedView
-			className="flex-1 bg-gray-50 dark:bg-black"
+			className="flex-1 bg-[#151718]"
 			style={{ paddingTop: insets.top }}
 		>
 			{/* Top Bar */}
 			<View className="flex-row items-center justify-between px-4 pt-3 pb-4">
 				<TouchableOpacity
 					onPress={handleBack}
-					className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center"
+					className="w-10 h-10 rounded-full bg-gray-800 items-center justify-center"
 				>
 					<MaterialIcons name="arrow-back-ios-new" size={20} color="gray" />
 				</TouchableOpacity>
 				<View className="items-center">
-					<Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+					<Text className="text-lg font-semibold text-[#ECEDEE]">
 						{status === "completed"
 							? "Game Finished"
 							: !!timeSelected
-							? "Time Attack"
-							: "Unlimited Time"}
+								? "Time Attack"
+								: "Unlimited Time"}
 					</Text>
 					{status === "completed" && createdAt && (
-						<Text className="text-xs text-gray-500 dark:text-gray-400">
+						<Text className="text-xs text-gray-400">
 							{new Date(createdAt).toLocaleDateString(undefined, {
 								year: "numeric",
 								month: "short",
@@ -787,7 +834,7 @@ export default function GameScreen() {
 				{/* Opponent (Top) */}
 				<View className="flex-row items-center justify-between mb-8">
 					<View className="flex-row items-center">
-						<View className="rounded-full w-14 h-14 mr-3 border border-gray-300 dark:border-gray-600 justify-center items-center overflow-hidden">
+						<View className="rounded-full w-14 h-14 mr-3 border border-gray-600 justify-center items-center overflow-hidden">
 							{opponentProfile?.avatar_url ? (
 								<Image
 									source={{
@@ -803,7 +850,7 @@ export default function GameScreen() {
 							)}
 						</View>
 						<View>
-							<Text className="text-base font-semibold text-gray-900 dark:text-gray-100">
+							<Text className="text-base font-semibold text-[#ECEDEE]">
 								{opponentProfile?.username || "Opponent"}
 							</Text>
 							<CapturedPieces
@@ -816,15 +863,15 @@ export default function GameScreen() {
 					<View
 						className={`px-3 py-1 rounded-md shadow-sm ${
 							activePlayer === "b" && gameStarted && !gameOver.over
-								? "bg-gray-800 dark:bg-gray-700 border-b-4 border-gray-600"
-								: "bg-gray-200 dark:bg-gray-800"
+								? "bg-gray-700 border-b-4 border-gray-600"
+								: "bg-gray-800"
 						}`}
 					>
 						<Text
 							className={`text-lg font-mono font-bold ${
 								activePlayer === "b" && gameStarted && !gameOver.over
 									? "text-white"
-									: "text-gray-600 dark:text-gray-400"
+									: "text-gray-400"
 							}`}
 						>
 							{!!timeSelected ? formatTime(blackTime || 0) : "∞"}
@@ -844,7 +891,7 @@ export default function GameScreen() {
 				{/* Player (Bottom) */}
 				<View className="flex-row items-center justify-between mt-8">
 					<View className="flex-row items-center">
-						<View className="rounded-full w-14 h-14 mr-3 border border-gray-300 dark:border-gray-600 justify-center items-center overflow-hidden">
+						<View className="rounded-full w-14 h-14 mr-3 border border-gray-600 justify-center items-center overflow-hidden">
 							{profile?.avatar_url ? (
 								<Image
 									source={{
@@ -860,7 +907,7 @@ export default function GameScreen() {
 							)}
 						</View>
 						<View>
-							<Text className="text-base font-semibold text-gray-900 dark:text-gray-100">
+							<Text className="text-base font-semibold text-[#ECEDEE]">
 								{profile?.username || "Player"}
 							</Text>
 							<CapturedPieces
@@ -873,15 +920,15 @@ export default function GameScreen() {
 					<View
 						className={`px-3 py-1 rounded-md shadow-sm ${
 							activePlayer === "w" && gameStarted && !gameOver.over
-								? "bg-white dark:bg-gray-200 border-b-4 border-gray-300"
-								: "bg-gray-200 dark:bg-gray-800"
+								? "bg-gray-200 border-b-4 border-gray-300"
+								: "bg-gray-800"
 						}`}
 					>
 						<Text
 							className={`text-lg font-mono font-bold ${
 								activePlayer === "w" && gameStarted && !gameOver.over
 									? "text-black"
-									: "text-gray-600 dark:text-gray-400"
+									: "text-gray-400"
 							}`}
 						>
 							{!!timeSelected ? formatTime(whiteTime || 0) : "∞"}
@@ -891,7 +938,7 @@ export default function GameScreen() {
 			</View>
 
 			{/* Move History Strip */}
-			<View className="h-12 bg-white dark:bg-black/40 border-t border-gray-200 dark:border-gray-800">
+			<View className="h-12 bg-black/40 border-t border-gray-800">
 				<FlatList
 					ref={listRef}
 					data={
@@ -905,7 +952,7 @@ export default function GameScreen() {
 										wIndex: moveIndex,
 										bIndex: moveIndex + 1,
 									};
-							  })
+								})
 							: []
 					}
 					horizontal
@@ -918,22 +965,18 @@ export default function GameScreen() {
 
 						return (
 							<View className="flex-row items-center mr-4">
-								<Text className="text-gray-500 dark:text-gray-500 font-mono mr-2 text-xs">
+								<Text className="text-gray-500 font-mono mr-2 text-xs">
 									{item.turnNumber}.
 								</Text>
 								<TouchableOpacity
 									onPress={() => handleNavigation("view", item.wIndex)}
 									className={`px-2 py-1 rounded ${
-										isWhiteSelected
-											? "bg-indigo-500"
-											: "bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800"
+										isWhiteSelected ? "bg-indigo-500" : "bg-transparent hover:bg-gray-800"
 									}`}
 								>
 									<Text
 										className={`${
-											isWhiteSelected
-												? "text-white font-bold"
-												: "text-gray-800 dark:text-gray-200"
+											isWhiteSelected ? "text-white font-bold" : "text-gray-200"
 										} text-sm font-medium`}
 									>
 										{item.white}
@@ -945,14 +988,12 @@ export default function GameScreen() {
 										className={`px-2 py-1 rounded ml-1 ${
 											isBlackSelected
 												? "bg-indigo-500"
-												: "bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800"
+												: "bg-transparent hover:bg-gray-800"
 										}`}
 									>
 										<Text
 											className={`${
-												isBlackSelected
-													? "text-white font-bold"
-													: "text-gray-800 dark:text-gray-200"
+												isBlackSelected ? "text-white font-bold" : "text-gray-200"
 											} text-sm font-medium`}
 										>
 											{item.black}
@@ -971,11 +1012,11 @@ export default function GameScreen() {
 			</View>
 
 			{/* Bottom Controls */}
-			<View className="flex-row items-center justify-between px-6 py-4 pb-8 bg-white/10 dark:bg-black/20 border-t border-gray-200 dark:border-gray-800">
+			<View className="flex-row items-center justify-between px-6 py-4 pb-8 bg-black/20 border-t border-gray-800">
 				{/* Resign Button */}
 				<Pressable
 					onPress={handleResign}
-					className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 items-center justify-center overflow-hidden"
+					className="w-12 h-12 rounded-full bg-red-900/30 items-center justify-center overflow-hidden"
 					disabled={status !== "active" || gameOver.over}
 					android_ripple={{ color: "#996e6eff", foreground: true }}
 					hitSlop={10}
@@ -988,7 +1029,7 @@ export default function GameScreen() {
 				</Pressable>
 
 				{/* Navigation Controls */}
-				<View className="flex-row items-center gap- bg-gray-100 dark:bg-gray-800/50 rounded-2xl">
+				<View className="flex-row items-center bg-gray-800/50 rounded-2xl">
 					<Pressable
 						onPress={() => handleNavigation("start")}
 						disabled={moveHistory.length === 0}
@@ -1054,9 +1095,9 @@ export default function GameScreen() {
 					gameOver.winner === null
 						? "draw"
 						: isPlayerWhite !== null &&
-						  gameOver.winner === (isPlayerWhite ? "w" : "b")
-						? "win"
-						: "loss"
+							  gameOver.winner === (isPlayerWhite ? "w" : "b")
+							? "win"
+							: "loss"
 				}
 				reason={gameOver.reason}
 				playerColor={isPlayerWhite ? "w" : "b"}

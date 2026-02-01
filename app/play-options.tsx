@@ -31,7 +31,7 @@ export default function PlayOptions() {
 	};
 
 	return (
-		<ThemedView className="flex-1 bg-white dark:bg-[#121212]">
+		<ThemedView className="flex-1 bg-[#121212]">
 			<ScrollView
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={{ paddingBottom: 40 }}
@@ -44,14 +44,14 @@ export default function PlayOptions() {
 							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 							router.back();
 						}}
-						className="mb-6 self-start bg-gray-100 dark:bg-gray-800 p-2 rounded-full"
+						className="mb-6 self-start bg-gray-800 p-2 rounded-full"
 					>
 						<MaterialCommunityIcons name="arrow-left" size={24} color="#666" />
 					</TouchableOpacity>
-					<Text className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+					<Text className="text-4xl font-bold text-white mb-2">
 						Play vs AI
 					</Text>
-					<Text className="text-lg text-gray-500 dark:text-gray-400">
+					<Text className="text-lg text-gray-400">
 						Configure your game and challenge Stockfish.
 					</Text>
 				</View>
@@ -59,17 +59,17 @@ export default function PlayOptions() {
 				{/* Settings Section */}
 				<View className="px-6">
 					{/* Difficulty Setting */}
-					<View className="mb-4 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl">
+					<View className="mb-4 bg-gray-800/50 p-5 rounded-2xl">
 						<View className="flex-row items-center justify-between mb-4">
 							<View className="flex-row items-center">
-								<View className="bg-indigo-100 dark:bg-indigo-900/50 p-2 rounded-xl mr-3">
+								<View className="bg-indigo-900/50 p-2 rounded-xl mr-3">
 									<MaterialCommunityIcons name="speedometer" size={24} color="#6366f1" />
 								</View>
 								<View>
-									<Text className="text-lg font-semibold text-gray-900 dark:text-white">
+									<Text className="text-lg font-semibold text-white">
 										AI Difficulty
 									</Text>
-									<Text className="text-sm text-gray-500 dark:text-gray-400">
+									<Text className="text-sm text-gray-400">
 										Level {difficulty} • {getDifficultyLabel(difficulty)}
 									</Text>
 								</View>
@@ -93,16 +93,16 @@ export default function PlayOptions() {
 					</View>
 
 					{/* Allow Undo Option */}
-					<View className="mb-4 bg-gray-50 dark:bg-gray-800/50 p-5 rounded-2xl flex-row items-center justify-between">
+					<View className="mb-4 bg-gray-800/50 p-5 rounded-2xl flex-row items-center justify-between">
 						<View className="flex-row items-center">
-							<View className="bg-orange-100 dark:bg-orange-900/50 p-2 rounded-xl mr-3">
+							<View className="bg-orange-900/50 p-2 rounded-xl mr-3">
 								<MaterialCommunityIcons name="undo" size={24} color="#f97316" />
 							</View>
 							<View>
-								<Text className="text-lg font-semibold text-gray-900 dark:text-white">
+								<Text className="text-lg font-semibold text-white">
 									Allow Undo
 								</Text>
-								<Text className="text-sm text-gray-500 dark:text-gray-400">
+								<Text className="text-sm text-gray-400">
 									Enable taking back moves
 								</Text>
 							</View>
@@ -120,7 +120,7 @@ export default function PlayOptions() {
 
 					{/* Player Color Selection */}
 					<View className="mb-4">
-						<Text className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+						<Text className="text-lg font-semibold text-white mb-4">
 							Play As
 						</Text>
 						<View className="flex-row gap-4">
@@ -131,8 +131,8 @@ export default function PlayOptions() {
 								}}
 								className={`flex-1 items-center py-5 rounded-2xl border-2 ${
 									playerColor === "w"
-										? "bg-white dark:bg-gray-800 border-indigo-500"
-										: "bg-gray-50 dark:bg-gray-800/50 border-transparent"
+										? "bg-gray-800 border-indigo-500"
+										: "bg-gray-800/50 border-transparent"
 								}`}
 							>
 								<View
@@ -149,8 +149,8 @@ export default function PlayOptions() {
 								<Text
 									className={`font-semibold ${
 										playerColor === "w"
-											? "text-indigo-600 dark:text-indigo-400"
-											: "text-gray-600 dark:text-gray-400"
+											? "text-indigo-400"
+											: "text-gray-400"
 									}`}
 								>
 									White
@@ -164,8 +164,8 @@ export default function PlayOptions() {
 								}}
 								className={`flex-1 items-center py-5 rounded-2xl border-2 ${
 									playerColor === "b"
-										? "bg-gray-900 dark:bg-gray-700 border-indigo-500"
-										: "bg-gray-50 dark:bg-gray-800/50 border-transparent"
+										? "bg-gray-700 border-indigo-500"
+										: "bg-gray-800/50 border-transparent"
 								}`}
 							>
 								<View
@@ -183,7 +183,7 @@ export default function PlayOptions() {
 									className={`font-semibold ${
 										playerColor === "b"
 											? "text-indigo-400"
-											: "text-gray-600 dark:text-gray-400"
+											: "text-gray-400"
 									}`}
 								>
 									Black

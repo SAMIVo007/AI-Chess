@@ -53,7 +53,7 @@ export default function HomeScreen() {
 						router.push("/account");
 					}}
 				>
-					<View className="w-14 h-14 rounded-full border border-gray-200 dark:border-gray-700 overflow-hidden items-center justify-center">
+					<View className="w-14 h-14 rounded-full border border-gray-200 border-gray-700 overflow-hidden items-center justify-center">
 						{profile?.avatar_url ? (
 							<Image
 								source={{ uri: profile.avatar_url }}
@@ -77,7 +77,7 @@ export default function HomeScreen() {
 				</View>
 			</View> */}
 
-			<Text className="text-xl font-bold text-gray-900 dark:text-white mb-5 mt-4">
+			<Text className="text-xl font-bold text-gray-900 text-white mb-5 mt-4">
 				Start Playing
 			</Text>
 

@@ -24,7 +24,7 @@ export default function ChallengeFriends() {
 	}, []);
 
 	return (
-		<ThemedView className="flex-1 bg-white dark:bg-[#121212]">
+		<ThemedView className="flex-1 bg-[#121212]">
 			<ScrollView
 				showsVerticalScrollIndicator={false}
 				contentContainerStyle={{ paddingBottom: 40 }}
@@ -37,14 +37,14 @@ export default function ChallengeFriends() {
 							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 							router.back();
 						}}
-						className="mb-6 self-start bg-gray-100 dark:bg-gray-800 p-2 rounded-full"
+						className="mb-6 self-start bg-gray-100 bg-gray-800 p-2 rounded-full"
 					>
 						<MaterialCommunityIcons name="arrow-left" size={24} color="#666" />
 					</TouchableOpacity>
-					<Text className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+					<Text className="text-4xl font-bold text-gray-900 text-white mb-2">
 						Online Chess
 					</Text>
-					<Text className="text-lg text-gray-500 dark:text-gray-400">
+					<Text className="text-lg text-gray-500 text-gray-400">
 						Play with friends or anyone around the world.
 					</Text>
 				</View>

@@ -21,6 +21,12 @@ configureReanimatedLogger({
 	strict: false, // Reanimated runs in strict mode by default
 });
 
+if (!__DEV__) {
+	console.log = () => {};
+	console.warn = () => {};
+	console.error = () => {};
+}
+
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import AuthContextProvider, { useAuth } from "@/context/AuthContext";
@@ -54,9 +60,12 @@ export default function RootLayout() {
 	return (
 		<GestureHandlerRootView style={{ flex: 1 }}>
 			<AuthContextProvider>
-				<ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+				<ThemeProvider
+					// value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+					value={DarkTheme}
+				>
 					<AppNavigator />
-					<StatusBar style="auto" />
+					<StatusBar style="light" />
 				</ThemeProvider>
 			</AuthContextProvider>
 		</GestureHandlerRootView>
@@ -109,7 +118,7 @@ export const AppNavigator = () => {
 					});
 			} else if (error_description) {
 				const decodedError = decodeURIComponent(
-					error_description.replace(/\+/g, " ")
+					error_description.replace(/\+/g, " "),
 				);
 				console.error(`[DeepLink] Auth Error: ${error_code} - ${decodedError}`);
 				Alert.alert("Authentication Error", decodedError);
@@ -122,7 +131,7 @@ export const AppNavigator = () => {
 			// For now, let's just log it or redirect to home if no valid route.
 			if (route.startsWith("join/")) {
 				console.log(
-					"[DeepLink] Join game link detected but join-game route is missing."
+					"[DeepLink] Join game link detected but join-game route is missing.",
 				);
 				router.push("/challenge-friends");
 			}
@@ -142,7 +151,7 @@ export const AppNavigator = () => {
 
 		return () => {
 			// @ts-ignore
-			// linkingListener?.remove();
+			linkingListener?.remove();
 		};
 	}, []);
 
@@ -161,13 +170,6 @@ export const AppNavigator = () => {
 				<Stack.Screen name="account" options={{ headerShown: false }} />
 				<Stack.Screen name="offline-game" options={{ headerShown: false }} />
 				<Stack.Screen name="online-game" options={{ headerShown: false }} />
-				<Stack.Screen
-					name="join-game"
-					options={{
-						title: "Joining Game...",
-						headerTitleAlign: "center",
-					}}
-				/>
 				<Stack.Screen
 					name="play-options"
 					options={{
