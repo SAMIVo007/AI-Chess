@@ -37,7 +37,7 @@ const { width } = Dimensions.get("window");
 
 const getDescriptiveMove = (
 	game: InstanceType<typeof Chess>,
-	uci: string
+	uci: string,
 ): string => {
 	const from = uci.slice(0, 2) as SquareNotation;
 	const to = uci.slice(2, 4) as SquareNotation;
@@ -162,16 +162,16 @@ export default function GameScreen() {
 
 	// Chess clocks with active player tracking
 	const [whiteTime, setWhiteTime] = useState<number | undefined>(
-		timeSelected ? parseInt(timeSelected, 10) : 300
+		timeSelected ? parseInt(timeSelected, 10) : 300,
 	);
 	const [blackTime, setBlackTime] = useState<number | undefined>(
-		timeSelected ? parseInt(timeSelected, 10) : 300
+		timeSelected ? parseInt(timeSelected, 10) : 300,
 	);
 	const [activePlayer, setActivePlayer] = useState<"w" | "b">("w"); // White starts
-	const [gameStarted, setGameStarted] = useState(false);
+	const [gameStarted, setGameStarted] = useState(true);
 	const [isMyTurn, setIsMyTurn] = useState(false);
 	const [isPlayerWhite, setIsPlayerWhite] = useState<boolean>(
-		playerColor === "b" ? false : true // default to true (White) if undefined
+		playerColor === "b" ? false : true, // default to true (White) if undefined
 	);
 
 	// Timer refs for cleanup
@@ -290,7 +290,7 @@ export default function GameScreen() {
 	const formatTime = (t: number) =>
 		`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(
 			2,
-			"0"
+			"0",
 		)}`;
 
 	const checkGameOver = () => {
@@ -335,9 +335,9 @@ export default function GameScreen() {
 							wIndex: moveIndex,
 							bIndex: moveIndex + 1,
 						};
-				  })
+					})
 				: [],
-		[moveHistory]
+		[moveHistory],
 	);
 
 	const handleResign = () => {
@@ -359,13 +359,13 @@ export default function GameScreen() {
 						setIsModalVisible(true);
 					},
 				},
-			]
+			],
 		);
 	};
 
 	const handleNavigation = (
 		action: "start" | "prev" | "next" | "end" | "view",
-		index?: number
+		index?: number,
 	) => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 		if (moveHistory.length === 0) return;
@@ -604,7 +604,7 @@ export default function GameScreen() {
 		// Reset game status
 		setGameOver({ over: false, reason: "checkmate", winner: null });
 		setIsModalVisible(false);
-		setGameStarted(false);
+		setGameStarted(true);
 
 		// Reset Clocks
 		const timeInSeconds = timeSelected ? parseInt(timeSelected, 10) : 300;
@@ -641,7 +641,7 @@ export default function GameScreen() {
 						style: "destructive",
 						onPress: () => router.back(),
 					},
-				]
+				],
 			);
 		} else {
 			router.back();
@@ -660,17 +660,14 @@ export default function GameScreen() {
 
 		const backHandler = BackHandler.addEventListener(
 			"hardwareBackPress",
-			backAction
+			backAction,
 		);
 
 		return () => backHandler.remove();
 	}, [gameStarted]);
 
 	return (
-		<ThemedView
-			className="flex-1 bg-black"
-			style={{ paddingTop: insets.top }}
-		>
+		<ThemedView className="flex-1 bg-black" style={{ paddingTop: insets.top }}>
 			{/* Top Bar */}
 			<View className="flex-row items-center justify-between px-4 pt-3 pb-4">
 				<TouchableOpacity
@@ -694,9 +691,7 @@ export default function GameScreen() {
 					<View className="flex-row items-center">
 						<View className="rounded-full w-14 h-14 mr-3 border border-gray-600 justify-center items-center overflow-hidden">
 							<Image
-								source={{
-									uri: "https://is1-ssl.mzstatic.com/image/thumb/Purple3/v4/30/35/ae/3035ae18-d9f9-7c3e-bf6d-055bff5c5d5a/mzl.rhnwdrfl.png/1024x1024bb.png",
-								}}
+								source={require("@/assets/images/stockfish-logo.png")}
 								style={{ width: "100%", height: "100%" }}
 								placeholder={{ blurhash: AiBlurhash }}
 								contentFit="cover"
@@ -813,16 +808,12 @@ export default function GameScreen() {
 								<TouchableOpacity
 									onPress={() => handleNavigation("view", item.wIndex)}
 									className={`px-2 py-1 rounded ${
-										isWhiteSelected
-											? "bg-indigo-500"
-											: "bg-transparent hover:bg-gray-800"
+										isWhiteSelected ? "bg-indigo-500" : "bg-transparent hover:bg-gray-800"
 									}`}
 								>
 									<Text
 										className={`${
-											isWhiteSelected
-												? "text-white font-bold"
-												: "text-gray-200"
+											isWhiteSelected ? "text-white font-bold" : "text-gray-200"
 										} text-sm font-medium`}
 									>
 										{item.white}
@@ -839,9 +830,7 @@ export default function GameScreen() {
 									>
 										<Text
 											className={`${
-												isBlackSelected
-													? "text-white font-bold"
-													: "text-gray-200"
+												isBlackSelected ? "text-white font-bold" : "text-gray-200"
 											} text-sm font-medium`}
 										>
 											{item.black}
@@ -982,8 +971,8 @@ export default function GameScreen() {
 					gameOver.winner === null
 						? "draw"
 						: gameOver.winner === (isPlayerWhite ? "w" : "b")
-						? "win"
-						: "loss"
+							? "win"
+							: "loss"
 				}
 				reason={gameOver.reason}
 				playerColor={isPlayerWhite ? "w" : "b"}
