@@ -87,7 +87,7 @@ export default function Auth() {
 		else if (!session)
 			Alert.alert(
 				"Registration Successful",
-				"Please check your inbox for email verification!"
+				"Please check your inbox (or spam folder) for email verification!",
 			);
 		setLoading(false);
 	}
@@ -136,7 +136,7 @@ export default function Auth() {
 		<View style={{ flex: 1 }}>
 			{/* Animated Gradient Background */}
 			<LinearGradient
-				colors={["#0f172a", "#1e1b4b", "#312e81"]}
+				colors={["#62759eff", "#1e1b4b", "#0c0a31ff"]}
 				start={{ x: 0, y: 0 }}
 				end={{ x: 1, y: 1 }}
 				style={StyleSheet.absoluteFill}
@@ -216,6 +216,7 @@ export default function Auth() {
 													value={username}
 													onChangeText={setUsername}
 													selectionColor="#818cf8"
+													keyboardAppearance="dark"
 												/>
 											</View>
 										</View>
@@ -258,6 +259,7 @@ export default function Auth() {
 											onChangeText={setEmail}
 											keyboardType="email-address"
 											selectionColor="#818cf8"
+											keyboardAppearance="dark"
 										/>
 									</View>
 								</View>
@@ -281,6 +283,7 @@ export default function Auth() {
 											onChangeText={setPassword}
 											autoCapitalize="none"
 											selectionColor="#818cf8"
+											keyboardAppearance="dark"
 										/>
 									</View>
 								</View>

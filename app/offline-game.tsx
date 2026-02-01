@@ -668,18 +668,18 @@ export default function GameScreen() {
 
 	return (
 		<ThemedView
-			className="flex-1 bg-gray-50 dark:bg-black"
+			className="flex-1 bg-black"
 			style={{ paddingTop: insets.top }}
 		>
 			{/* Top Bar */}
 			<View className="flex-row items-center justify-between px-4 pt-3 pb-4">
 				<TouchableOpacity
 					onPress={handleBack}
-					className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center"
+					className="w-10 h-10 rounded-full bg-gray-800 items-center justify-center"
 				>
 					<MaterialIcons name="arrow-back-ios-new" size={20} color="gray" />
 				</TouchableOpacity>
-				<Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+				<Text className="text-lg font-semibold text-gray-100">
 					{!!timeSelected ? "Time Attack" : "Unlimited Time"}
 				</Text>
 				<TouchableOpacity className="p-2 opacity-0" disabled>
@@ -692,7 +692,7 @@ export default function GameScreen() {
 				{/* Opponent (Top) */}
 				<View className="flex-row items-center justify-between mb-8">
 					<View className="flex-row items-center">
-						<View className="rounded-full w-14 h-14 mr-3 border border-gray-300 dark:border-gray-600 justify-center items-center overflow-hidden">
+						<View className="rounded-full w-14 h-14 mr-3 border border-gray-600 justify-center items-center overflow-hidden">
 							<Image
 								source={{
 									uri: "https://is1-ssl.mzstatic.com/image/thumb/Purple3/v4/30/35/ae/3035ae18-d9f9-7c3e-bf6d-055bff5c5d5a/mzl.rhnwdrfl.png/1024x1024bb.png",
@@ -704,7 +704,7 @@ export default function GameScreen() {
 							/>
 						</View>
 						<View>
-							<Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+							<Text className="text-lg font-semibold text-gray-100">
 								Stockfish AI ({getRating(levelSelected)})
 							</Text>
 							<CapturedPieces
@@ -717,15 +717,15 @@ export default function GameScreen() {
 					<View
 						className={`px-3 py-1 rounded-md shadow-sm ${
 							activePlayer === "b" && gameStarted && !gameOver.over
-								? "bg-gray-800 dark:bg-gray-700 border-b-4 border-gray-600"
-								: "bg-gray-200 dark:bg-gray-800"
+								? "bg-gray-700 border-b-4 border-gray-600"
+								: "bg-gray-800"
 						}`}
 					>
 						<Text
 							className={`text-lg font-mono font-bold ${
 								activePlayer === "b" && gameStarted && !gameOver.over
 									? "text-white"
-									: "text-gray-600 dark:text-gray-400"
+									: "text-gray-400"
 							}`}
 						>
 							{!!timeSelected ? formatTime(blackTime || 0) : "∞"}
@@ -746,7 +746,7 @@ export default function GameScreen() {
 				{/* Player (Bottom) */}
 				<View className="flex-row items-center justify-between mt-8">
 					<View className="flex-row items-center">
-						<View className="rounded-full w-14 h-14 mr-3 border border-gray-300 dark:border-gray-600 justify-center items-center overflow-hidden">
+						<View className="rounded-full w-14 h-14 mr-3 border border-gray-600 justify-center items-center overflow-hidden">
 							{profile?.avatar_url ? (
 								<Image
 									source={{
@@ -762,7 +762,7 @@ export default function GameScreen() {
 							)}
 						</View>
 						<View>
-							<Text className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+							<Text className="text-lg font-semibold text-gray-100">
 								{profile?.username || session?.user?.email?.split("@")[0] || "Player"}
 							</Text>
 							<CapturedPieces
@@ -775,15 +775,15 @@ export default function GameScreen() {
 					<View
 						className={`px-3 py-1 rounded-md shadow-sm ${
 							activePlayer === "w" && gameStarted && !gameOver.over
-								? "bg-white dark:bg-gray-200 border-b-4 border-gray-300"
-								: "bg-gray-200 dark:bg-gray-800"
+								? "bg-gray-200 border-b-4 border-gray-300"
+								: "bg-gray-800"
 						}`}
 					>
 						<Text
 							className={`text-lg font-mono font-bold ${
 								activePlayer === "w" && gameStarted && !gameOver.over
 									? "text-black"
-									: "text-gray-600 dark:text-gray-400"
+									: "text-gray-400"
 							}`}
 						>
 							{!!timeSelected ? formatTime(whiteTime || 0) : "∞"}
@@ -793,7 +793,7 @@ export default function GameScreen() {
 			</View>
 
 			{/* Move History Strip */}
-			<View className="h-12 bg-white dark:bg-black/40 border-t border-gray-200 dark:border-gray-800">
+			<View className="h-12 bg-black/40 border-t border-gray-800">
 				<FlatList
 					ref={listRef}
 					data={moveHistoryArray}
@@ -807,7 +807,7 @@ export default function GameScreen() {
 
 						return (
 							<View className="flex-row items-center mr-4">
-								<Text className="text-gray-500 dark:text-gray-500 font-mono mr-2 text-xs">
+								<Text className="text-gray-500 font-mono mr-2 text-xs">
 									{item.turnNumber}.
 								</Text>
 								<TouchableOpacity
@@ -815,14 +815,14 @@ export default function GameScreen() {
 									className={`px-2 py-1 rounded ${
 										isWhiteSelected
 											? "bg-indigo-500"
-											: "bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800"
+											: "bg-transparent hover:bg-gray-800"
 									}`}
 								>
 									<Text
 										className={`${
 											isWhiteSelected
 												? "text-white font-bold"
-												: "text-gray-800 dark:text-gray-200"
+												: "text-gray-200"
 										} text-sm font-medium`}
 									>
 										{item.white}
@@ -834,14 +834,14 @@ export default function GameScreen() {
 										className={`px-2 py-1 rounded ml-1 ${
 											isBlackSelected
 												? "bg-indigo-500"
-												: "bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800"
+												: "bg-transparent hover:bg-gray-800"
 										}`}
 									>
 										<Text
 											className={`${
 												isBlackSelected
 													? "text-white font-bold"
-													: "text-gray-800 dark:text-gray-200"
+													: "text-gray-200"
 											} text-sm font-medium`}
 										>
 											{item.black}
@@ -860,7 +860,7 @@ export default function GameScreen() {
 			</View>
 
 			{/* Bottom Controls */}
-			<View className="flex-row items-center justify-between px-6 py-4 pb-8 bg-white/10 dark:bg-black/20 border-t border-gray-200 dark:border-gray-800">
+			<View className="flex-row items-center justify-between px-6 py-4 pb-8 bg-black/20 border-t border-gray-800">
 				<View className="flex-row items-center gap-2">
 					{/* Undo Button (Start) - Only if enabled */}
 					{allowUndo === "true" && (
@@ -869,7 +869,7 @@ export default function GameScreen() {
 							disabled={
 								!isMyTurn || moveHistory.length === 0 || viewingMoveIndex !== null
 							}
-							className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center mr-2 overflow-hidden"
+							className="w-12 h-12 rounded-full bg-gray-800 items-center justify-center mr-2 overflow-hidden"
 							android_ripple={{ color: "#7576a8ff", foreground: true }}
 						>
 							<MaterialCommunityIcons
@@ -887,7 +887,7 @@ export default function GameScreen() {
 					{/* Resign Button */}
 					<Pressable
 						onPress={handleResign}
-						className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 items-center justify-center overflow-hidden"
+						className="w-12 h-12 rounded-full bg-red-900/30 items-center justify-center overflow-hidden"
 						disabled={gameOver.over}
 						android_ripple={{ color: "#996e6eff", foreground: true }}
 					>
@@ -904,7 +904,7 @@ export default function GameScreen() {
 							Haptics.selectionAsync();
 							setVoiceOn((v) => !v);
 						}}
-						className="w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center mx-2 overflow-hidden"
+						className="w-12 h-12 rounded-full bg-gray-800 items-center justify-center mx-2 overflow-hidden"
 						android_ripple={{ color: "#7576a8ff", foreground: true }}
 					>
 						<MaterialCommunityIcons
@@ -916,7 +916,7 @@ export default function GameScreen() {
 				</View>
 
 				{/* Navigation Controls */}
-				<View className="flex-row items-center gap- bg-gray-100 dark:bg-gray-800/50 rounded-2xl">
+				<View className="flex-row items-center bg-gray-800/50 rounded-2xl">
 					<Pressable
 						onPress={() => handleNavigation("start")}
 						disabled={moveHistory.length === 0}

@@ -131,7 +131,7 @@ export default function Account() {
 								Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 								router.back();
 							}}
-							className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center"
+							className="w-10 h-10 rounded-full bg-gray-800 items-center justify-center"
 						>
 							<MaterialIcons name="arrow-back-ios-new" size={20} color="gray" />
 						</TouchableOpacity>
@@ -142,7 +142,7 @@ export default function Account() {
 					{/* Avatar Section */}
 					<View className="items-center mb-8">
 						<View className="relative">
-							<View className="w-28 h-28 rounded-full border-4 border-gray-100 dark:border-gray-800 overflow-hidden bg-gray-200 dark:bg-gray-700 items-center justify-center">
+							<View className="w-28 h-28 rounded-full border-4 border-gray-800 overflow-hidden bg-gray-700 items-center justify-center">
 								{avatarUrl ? (
 									<Image
 										source={{ uri: avatarUrl }}
@@ -156,7 +156,7 @@ export default function Account() {
 								)}
 							</View>
 							<TouchableOpacity
-								className="absolute bottom-0 right-0 bg-indigo-600 w-9 h-9 rounded-full items-center justify-center border-2 border-white dark:border-black"
+								className="absolute bottom-0 right-0 bg-indigo-600 w-9 h-9 rounded-full items-center justify-center border-2 border-black"
 								onPress={() => {
 									Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
 									Alert.alert("Coming Soon", "Image upload implementation coming soon!");
@@ -165,7 +165,7 @@ export default function Account() {
 								<MaterialIcons name="camera-alt" size={16} color="white" />
 							</TouchableOpacity>
 						</View>
-						<ThemedText className="mt-4 text-gray-500 dark:text-gray-400 text-sm">
+						<ThemedText className="mt-4 text-gray-400 text-sm">
 							{session?.user?.email}
 						</ThemedText>
 					</View>
@@ -176,7 +176,7 @@ export default function Account() {
 							<ThemedText className="text-sm font-medium text-gray-500 mb-2 ml-1">
 								Username
 							</ThemedText>
-							<View className="flex-row items-center bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl px-4 py-2">
+							<View className="flex-row items-center bg-gray-900 border border-gray-800 rounded-2xl px-4 py-2">
 								<FontAwesome5
 									name="user"
 									size={16}
@@ -184,7 +184,7 @@ export default function Account() {
 									style={{ marginRight: 12 }}
 								/>
 								<TextInput
-									className="flex-1 text-base text-gray-900 dark:text-gray-100"
+									className="flex-1 text-base text-gray-100"
 									placeholder="Enter your username"
 									placeholderTextColor="#9ca3af"
 									value={username}
@@ -197,7 +197,7 @@ export default function Account() {
 							<ThemedText className="text-sm font-medium text-gray-500 mb-2 ml-1">
 								Bio
 							</ThemedText>
-							<View className="flex-row items-center bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl px-4 py-2">
+							<View className="flex-row items-center bg-gray-900 border border-gray-800 rounded-2xl px-4 py-2">
 								<FontAwesome5
 									name="globe"
 									size={16}
@@ -205,7 +205,7 @@ export default function Account() {
 									style={{ marginRight: 12 }}
 								/>
 								<TextInput
-									className="flex-1 text-base text-gray-900 dark:text-gray-100"
+									className="flex-1 text-base text-gray-100"
 									placeholder="Tell us about yourself"
 									placeholderTextColor="#9ca3af"
 									value={website}
@@ -234,13 +234,13 @@ export default function Account() {
 						</TouchableOpacity>
 
 						<TouchableOpacity
-							className="bg-red-50 dark:bg-red-900/20 py-4 rounded-2xl items-center border border-red-100 dark:border-red-900/30"
+							className="bg-red-900/20 py-4 rounded-2xl items-center border border-red-900/30"
 							onPress={() => {
 								Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 								signOut();
 							}}
 						>
-							<ThemedText className="text-red-600 dark:text-red-400 font-semibold text-base">
+							<ThemedText className="text-red-400 font-semibold text-base">
 								Sign Out
 							</ThemedText>
 						</TouchableOpacity>

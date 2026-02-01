@@ -65,35 +65,35 @@ export default function RecentGamesList() {
 		// Determining status label & result
 		let statusLabel = "Unknown";
 		let statusColor = "text-gray-500";
-		let statusBg = "bg-gray-100 dark:bg-gray-800";
+		let statusBg = "bg-gray-800";
 
 		if (item.status === "active") {
 			statusLabel = "Playing";
-			statusColor = "text-indigo-600 dark:text-indigo-400";
-			statusBg = "bg-indigo-50 dark:bg-indigo-900/20";
+			statusColor = "text-indigo-400";
+			statusBg = "bg-indigo-900/20";
 		} else if (item.status === "completed") {
 			if (item.winner_id) {
 				const iWon = item.winner_id === session?.user?.id;
 
 				if (iWon) {
 					statusLabel = "Won";
-					statusColor = "text-green-600 dark:text-green-400";
-					statusBg = "bg-green-50 dark:bg-green-900/20";
+					statusColor = "text-green-400";
+					statusBg = "bg-green-900/20";
 				} else {
 					statusLabel = "Lost";
-					statusColor = "text-red-600 dark:text-red-400";
-					statusBg = "bg-red-50 dark:bg-red-900/20";
+					statusColor = "text-red-400";
+					statusBg = "bg-red-900/20";
 				}
 			} else {
 				// Completed but no winner_id => Draw
 				statusLabel = "Draw";
-				statusColor = "text-gray-600 dark:text-gray-300";
-				statusBg = "bg-gray-100 dark:bg-gray-800";
+				statusColor = "text-gray-300";
+				statusBg = "bg-gray-800";
 			}
 		} else if (item.status === "waiting") {
 			statusLabel = "Waiting";
-			statusColor = "text-orange-600 dark:text-orange-400";
-			statusBg = "bg-orange-50 dark:bg-orange-900/20";
+			statusColor = "text-orange-400";
+			statusBg = "bg-orange-900/20";
 		}
 
 		return (
@@ -119,7 +119,7 @@ export default function RecentGamesList() {
 				>
 					<View className="flex-row items-center flex-1">
 						{/* Opponent Avatar */}
-						<View className="w-12 h-12 rounded-full mr-4 border border-gray-200 dark:border-gray-700 overflow-hidden items-center justify-center">
+						<View className="w-12 h-12 rounded-full mr-4 border border-gray-700 overflow-hidden items-center justify-center">
 							{opponent?.avatar_url ? (
 								<Image
 									source={{ uri: opponent.avatar_url }}
@@ -139,7 +139,7 @@ export default function RecentGamesList() {
 						{/* Info */}
 						<View className="flex-1 mr-2">
 							<Text
-								className="text-gray-900 dark:text-white font-bold text-base mb-1"
+								className="text-white font-bold text-base mb-1"
 								numberOfLines={1}
 							>
 								{item.status === "waiting"
@@ -152,13 +152,13 @@ export default function RecentGamesList() {
 								<View
 									className={`w-3 h-3 rounded-full mr-2 border border-gray-300 ${
 										item.status === "waiting"
-											? "bg-gray-300 dark:bg-gray-600"
+											? "bg-gray-600"
 											: !!isWhite
 											? "bg-white"
 											: "bg-black"
 									}`}
 								/>
-								<Text className="text-gray-500 dark:text-gray-400 text-xs font-medium">
+								<Text className="text-gray-400 text-xs font-medium">
 									{formatDate(item.created_at)}
 								</Text>
 							</View>
@@ -212,7 +212,7 @@ export default function RecentGamesList() {
 						loadGames();
 					}}
 				>
-					<Text className="text-indigo-600 dark:text-indigo-400 font-semibold">
+					<Text className="text-indigo-400 font-semibold">
 						Reload
 					</Text>
 				</TouchableOpacity>

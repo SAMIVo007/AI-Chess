@@ -67,9 +67,12 @@ export default function AuthContextProvider({
 		return () => subscription.unsubscribe();
 	}, []);
 
-	return (
-		<AuthContext value={{ session, profile, loading }}>{children}</AuthContext>
+	const value = React.useMemo(
+		() => ({ session, profile, loading }),
+		[session, profile, loading],
 	);
+
+	return <AuthContext value={value}>{children}</AuthContext>;
 }
 
 export const useAuth = () => {
