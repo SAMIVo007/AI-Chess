@@ -1,50 +1,119 @@
-# Welcome to your Expo app 👋
+# ♟️ AI Chess
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A premium, feature-rich chess application built with **React Native (Expo)**, featuring real-time online multiplayer, powerful offline AI analysis, and a stunning modern UI.
 
-## Get started
+<div align="center">
+  <img src="./assets/images/app-logo.png" alt="AI Chess Banner" width="100%" style="border-radius: 10px" />
+</div>
 
-1. Install dependencies
+## ✨ Features
+
+### 🎮 Gameplay Modes
+
+- **Offline vs AI**: Challenge the Stockfish engine with adjustable difficulty levels (800 - 2600 ELO).
+- **Online Multiplayer**: Play real-time matches against friends or random opponents across the globe.
+
+### 🧠 Smart Analysis
+
+- **Stockfish Integration**: Real-time move analysis and evaluation.
+- **Voice Feedback**: Text-to-speech move announcements for an immersive experience.
+- **History & Replay**: detailed move history with forward/backward navigation to review matches.
+
+### 🎨 Modern UI/UX
+
+- **Premium Aesthetics**: A sleek dark theme and smooth animations.
+- **Interactive Board**: Tap-to-move piece movement with valid move indicators.
+- **Haptic Feedback**: Tactile response for button clicks all over the UI.
+- **Player Profiles**: Custom avatars, usernames, and game statistics.
+
+### 🔐 Authentication
+
+- **Secure Login**: Powered by Supabase Auth with Email/Password and Google Sign-In support.
+- **Profile Management**: Customize your player identity and track your game history.
+
+## 🛠️ Tech Stack
+
+- **Framework**: [React Native](https://reactnative.dev/) with [Expo](https://expo.dev/)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [NativeWind (Tailwind CSS)](https://www.nativewind.dev/) + Stylesheets
+- **Backend & Auth**: [Supabase](https://supabase.com/) (PostgreSQL, Realtime, Auth)
+- **State Management**: React Hooks & Context API
+- **Navigation**: [Expo Router](https://docs.expo.dev/router/introduction/)
+- **Chess Logic**: `chess.js` for rules, `stockfish` for AI
+- **Animations**: `react-native-reanimated` & `lottie-react-native`
+
+## 🚀 Getting Started
+
+Follow these steps to set up the project locally.
+
+### Prerequisites
+
+- Node.js (v18 or later)
+- Expo Dev Client (Expo-Go won't work) on your physical device or Emulator
+
+### Installation
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/<your-username>/ai-chess.git
+   cd ai-chess
+   ```
+
+2. **Install dependencies**
 
    ```bash
    npm install
    ```
 
-2. Start the app
+3. **Environment Setup**
+   Create a `.env` file in the root directory and add your keys:
 
-   ```bash
-    npx expo start
+   ```env
+   EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+   EXPO_PUBLIC_SUPABASE_KEY=your_supabase_anon_key
+   EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=your_google_client_id
    ```
 
-In the output, you'll find options to open the app in a
+4. **Start the Development Server**
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   ```bash
+   npx expo run:android
+   ```
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 📱 Project Structure
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+ai-chess/
+├── app/                 # Expo Router pages (screens)
+│   ├── auth.tsx         # Login/Signup screen
+│   ├── (tabs)/          # Main tab navigation
+│   ├── offline-game.tsx # Local AI game logic
+│   └── online-game.tsx  # Multiplayer game logic
+├── components/          # Reusable UI components
+│   ├── chess/           # Chess-specific components (Board, Pieces)
+│   └── ...
+├── constants/           # App constants (Colors, Types)
+├── utils/               # Helper functions (AI, Voice, Supabase)
+└── assets/              # Images, fonts, and icons
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 🤝 Contributing
 
-## Learn more
+Contributions are welcome! Please open an issue or submit a pull request for any bugs, improvements, or new features.
 
-To learn more about developing your project with Expo, look at the following resources:
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## 📄 License
 
-## Join the community
+This project is open-source and available under the [MIT License](LICENSE).
 
-Join our community of developers creating universal apps.
+---
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+<p align="center">
+  Built with ❤️ by Yuvraj Singh
+</p>
