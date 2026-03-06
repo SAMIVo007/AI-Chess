@@ -26,9 +26,9 @@ export const fetchUserGames = async (userId: string) => {
 		.select(
 			`
 			*,
-			white_player:profiles!white_player_id(username, avatar_url),
-			black_player:profiles!black_player_id(username, avatar_url)
-		`
+			white_player:profiles!white_player_id(username, full_name, avatar_url),
+			black_player:profiles!black_player_id(username, full_name, avatar_url)
+		`,
 		)
 		.or(`white_player_id.eq.${userId},black_player_id.eq.${userId}`)
 		.order("created_at", { ascending: false });
@@ -94,7 +94,7 @@ export const createNewGame = async (userId: string) => {
 // Enhanced createGameWithInvite with options & robust unique code handling
 export const createGameWithInvite = async (
 	userId: string,
-	options: CreateInviteOptions = {}
+	options: CreateInviteOptions = {},
 ): Promise<CreateInviteResult | null> => {
 	await cleanupExpiredGames();
 

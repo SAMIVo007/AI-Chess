@@ -7,7 +7,7 @@ import React, {
 	useImperativeHandle,
 	forwardRef,
 } from "react";
-import Square, { SQUARE_SIZE } from "./Square";
+import Square from "./Square";
 import Piece from "./Piece";
 import { BoardProps, PieceProps, PromotionPieceType } from "@/constants/Types";
 import {
@@ -27,10 +27,11 @@ export interface ChessBoardRef {
 	move: (
 		from: SquareType,
 		to: SquareType,
-		promotion?: PromotionPieceType
+		promotion?: PromotionPieceType,
 	) => void;
 	reset: (fen?: string) => void;
 	undo: () => void;
+	highlightLastMove: (from: string, to: string) => void;
 }
 
 interface AnimatedPiece {
@@ -42,7 +43,7 @@ interface AnimatedPiece {
 }
 
 const getInitialPieces = (
-	board: ({ type: PieceType; color: PieceColor } | null)[][]
+	board: ({ type: PieceType; color: PieceColor } | null)[][],
 ) => {
 	const pieces: AnimatedPiece[] = [];
 	board.forEach((row, rowIndex) => {
@@ -65,7 +66,9 @@ const renderSquares = (
 	orientation: PieceColor,
 	onSquarePress: (row: number, col: number) => void,
 	selectedSquare: { row: number; col: number } | null,
-	possibleMoves: Move[]
+	possibleMoves: Move[],
+	squareSize: number,
+	lastMove: { from: string; to: string } | null,
 ) => {
 	return Array.from({ length: 64 }).map((_, index) => {
 		const row =
@@ -77,6 +80,9 @@ const renderSquares = (
 		const move = possibleMoves.find((m) => m.to === squareName);
 		const isHighlighted = !!move;
 		const isCapture = move?.flags.includes("c") || move?.flags.includes("e"); // c = capture, e = en passant
+		const isLastMove = lastMove
+			? squareName === lastMove.from || squareName === lastMove.to
+			: false;
 
 		return (
 			<Square
@@ -85,10 +91,12 @@ const renderSquares = (
 				color={(row + col) % 2 === 0 ? "light" : "dark"}
 				row={row}
 				col={col}
+				squareSize={squareSize}
 				onPress={onSquarePress}
 				isSelected={isSelected}
 				isHighlighted={isHighlighted}
 				isCapture={isCapture}
+				isLastMove={isLastMove}
 			/>
 		);
 	});
@@ -96,6 +104,10 @@ const renderSquares = (
 
 const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 	({ orientation = "w", onMove, interactive = true }, ref) => {
+		// Self-measure: use onLayout to get the actual available width
+		const [boardSize, setBoardSize] = useState(0);
+		const squareSize = boardSize / 8;
+
 		// 1. Initialize the game engine
 		const gameRef = useRef(new Chess());
 		const game = gameRef.current; // Stable reference that persists
@@ -104,7 +116,7 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 		// It contains objects like { type: 'p', color: 'b' } or null.
 		const [board, setBoard] = useState(game.board());
 		const [pieces, setPieces] = useState<AnimatedPiece[]>(() =>
-			getInitialPieces(game.board())
+			getInitialPieces(game.board()),
 		);
 
 		// 3. Selection State (for moving)
@@ -115,6 +127,11 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 
 		// 4. Possible Moves State
 		const [possibleMoves, setPossibleMoves] = useState<Move[]>([]);
+
+		// 5. Last Move State (for highlighting)
+		const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(
+			null,
+		);
 
 		// 5. Promotion State
 
@@ -167,7 +184,7 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 							const end = parseSquare(move.to);
 
 							const movingPieceIndex = next.findIndex(
-								(p) => p.row === start.row && p.col === start.col
+								(p) => p.row === start.row && p.col === start.col,
 							);
 							if (movingPieceIndex === -1) return next; // Should not happen
 
@@ -185,14 +202,16 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 							if (move.flags.includes("e")) {
 								// En Passant: capture is at {row: start.row, col: end.col}
 								const capturedIndex = next.findIndex(
-									(p) => p.row === start.row && p.col === end.col
+									(p) => p.row === start.row && p.col === end.col,
 								);
 								if (capturedIndex !== -1) next.splice(capturedIndex, 1);
 							} else if (move.captured) {
 								// Standard capture at destination
 								const capturedIndex = next.findIndex(
 									(p) =>
-										p.row === end.row && p.col === end.col && p !== next[movingPieceIndex]
+										p.row === end.row &&
+										p.col === end.col &&
+										p !== next[movingPieceIndex],
 								);
 								if (capturedIndex !== -1) next.splice(capturedIndex, 1);
 							}
@@ -206,7 +225,7 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 								const row = start.row; // 0 for black, 7 for white
 
 								const rookIndex = next.findIndex(
-									(p) => p.row === row && p.col === rookStartCol
+									(p) => p.row === row && p.col === rookStartCol,
 								);
 								if (rookIndex !== -1) {
 									next[rookIndex] = { ...next[rookIndex], col: rookEndCol };
@@ -216,6 +235,9 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 							return next;
 						});
 
+						// Track last move for highlighting
+						setLastMove({ from: move.from, to: move.to });
+
 						return move;
 					}
 				} catch (e) {
@@ -223,7 +245,7 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 				}
 				return null;
 			},
-			[game]
+			[game],
 		);
 
 		// --- EXPOSE METHODS TO PARENT ---
@@ -231,7 +253,7 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 			move: (
 				from: SquareType,
 				to: SquareType,
-				promotion: PromotionPieceType = "q"
+				promotion: PromotionPieceType = "q",
 			) => {
 				// Called by Stockfish or Supabase
 				// AI/Auto moves usually specify promotion or default to Queen
@@ -244,11 +266,30 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 				setPieces(getInitialPieces(game.board()));
 				setSelectedSquare(null);
 				setPossibleMoves([]);
+				// Recompute last move from game history after reset
+				const history = game.history({ verbose: true });
+				if (history.length > 0) {
+					const last = history[history.length - 1];
+					setLastMove({ from: last.from, to: last.to });
+				} else {
+					setLastMove(null);
+				}
 			},
 			undo: () => {
 				game.undo();
 				setBoard(game.board());
 				setPieces(getInitialPieces(game.board())); // Lazy undo: just reset pieces from board
+				// Update last move after undo
+				const history = game.history({ verbose: true });
+				if (history.length > 0) {
+					const last = history[history.length - 1];
+					setLastMove({ from: last.from, to: last.to });
+				} else {
+					setLastMove(null);
+				}
+			},
+			highlightLastMove: (from: string, to: string) => {
+				setLastMove({ from, to });
 			},
 		}));
 
@@ -272,14 +313,14 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 					const from = rowColToSquare(
 						currentSelected.row,
 						currentSelected.col,
-						orientation
+						orientation,
 					);
 					const to = rowColToSquare(row, col, orientation);
 
 					// Check Promotion
 					const moves = game.moves({ verbose: true });
 					const isPromotion = moves.find(
-						(m) => m.from === from && m.to === to && m.flags.includes("p")
+						(m) => m.from === from && m.to === to && m.flags.includes("p"),
 					);
 
 					if (isPromotion) {
@@ -314,7 +355,7 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 					setShowPieceSelector({ show: false, position: 0 });
 				}
 			},
-			[game, orientation, executeMove, onMove]
+			[game, orientation, executeMove, onMove],
 		);
 
 		// --- PROMOTION HANDLER ---
@@ -327,64 +368,79 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 		};
 
 		return (
-			<View style={{ position: "relative" }}>
-				{showPieceSelector?.show && (
-					<View
-						style={{
-							position: "absolute",
-							bottom: SQUARE_SIZE * 8 + 8,
-							left:
-								showPieceSelector.position < 4
-									? showPieceSelector.position * SQUARE_SIZE
-									: undefined,
-							right:
-								showPieceSelector.position >= 4
-									? (7 - showPieceSelector.position) * SQUARE_SIZE
-									: undefined,
-							zIndex: 20,
-						}}
-					>
-						<PieceSelector color={orientation} onPress={handlePromotionSelect} />
+			<View
+				style={{ width: "100%", aspectRatio: 1 }}
+				onLayout={(e) => {
+					const w = e.nativeEvent.layout.width;
+					if (w > 0 && w !== boardSize) setBoardSize(w);
+				}}
+			>
+				{boardSize > 0 && (
+					<View style={{ position: "relative" }}>
+						{showPieceSelector?.show && (
+							<View
+								style={{
+									position: "absolute",
+									bottom: squareSize * 8 + 8,
+									left:
+										showPieceSelector.position < 4
+											? showPieceSelector.position * squareSize
+											: undefined,
+									right:
+										showPieceSelector.position >= 4
+											? (7 - showPieceSelector.position) * squareSize
+											: undefined,
+									zIndex: 20,
+								}}
+							>
+								<PieceSelector
+									color={orientation}
+									squareSize={squareSize}
+									onPress={handlePromotionSelect}
+								/>
+							</View>
+						)}
+						<View
+							style={{
+								position: "relative",
+								flexDirection: "row",
+								flexWrap: "wrap",
+								width: boardSize,
+								height: boardSize,
+							}}
+						>
+							{/* Squares */}
+							{renderSquares(
+								orientation,
+								handleSquarePress,
+								selectedSquare,
+								possibleMoves,
+								squareSize,
+								lastMove,
+							)}
+
+							{/* Pieces */}
+							{pieces.map((piece) => (
+								<Piece
+									key={piece.id}
+									type={piece.type}
+									color={piece.color}
+									row={orientation === "w" ? piece.row : 7 - piece.row}
+									col={orientation === "w" ? piece.col : 7 - piece.col}
+									squareSize={squareSize}
+									onPress={() => handleSquarePress(piece.row, piece.col)}
+									position={rowColToSquare(piece.row, piece.col, orientation)}
+									isSelected={
+										selectedSquare?.row === piece.row && selectedSquare?.col === piece.col
+									}
+								/>
+							))}
+						</View>
 					</View>
 				)}
-				<View
-					style={{
-						position: "relative",
-						flexDirection: "row",
-						flexWrap: "wrap",
-						width: width,
-						height: width,
-						justifyContent: "center",
-						alignItems: "center",
-					}}
-				>
-					{/* Squares */}
-					{renderSquares(
-						orientation,
-						handleSquarePress,
-						selectedSquare,
-						possibleMoves
-					)}
-
-					{/* Pieces */}
-					{pieces.map((piece) => (
-						<Piece
-							key={piece.id}
-							type={piece.type}
-							color={piece.color}
-							row={orientation === "w" ? piece.row : 7 - piece.row}
-							col={orientation === "w" ? piece.col : 7 - piece.col}
-							onPress={() => handleSquarePress(piece.row, piece.col)}
-							position={rowColToSquare(piece.row, piece.col, orientation)}
-							isSelected={
-								selectedSquare?.row === piece.row && selectedSquare?.col === piece.col
-							}
-						/>
-					))}
-				</View>
 			</View>
 		);
-	}
+	},
 );
 
 export default ChessBoard;

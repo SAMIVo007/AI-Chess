@@ -50,7 +50,7 @@ export default function HomeScreen() {
 					className="bg-gray-800 rounded-full border border-gray-700"
 					onPress={() => {
 						Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-						router.push("/account");
+						router.push(session ? "/account" : "/auth");
 					}}
 				>
 					<View className="w-14 h-14 rounded-full border border-gray-200 border-gray-700 overflow-hidden items-center justify-center">
@@ -94,12 +94,16 @@ export default function HomeScreen() {
 
 			<ActionCard
 				title="Play Online"
-				subtitle="Challenge Friends"
+				subtitle={session ? "Challenge Friends" : "Login required"}
 				icon="earth"
-				color="#059669" // Emerald 600
+				color={session ? "#059669" : "#4b5563"} // Emerald 600 or Gray when offline
 				onPress={() => {
 					Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-					router.push("/challenge-friends");
+					if (session) {
+						router.push("/challenge-friends");
+					} else {
+						router.push("/auth");
+					}
 				}}
 			/>
 		</View>

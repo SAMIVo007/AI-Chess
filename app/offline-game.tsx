@@ -1,4 +1,13 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
+import Animated, {
+	useSharedValue,
+	useAnimatedStyle,
+	withRepeat,
+	withSequence,
+	withTiming,
+	cancelAnimation,
+	Easing,
+} from "react-native-reanimated";
 import type { ComponentProps } from "react";
 import {
 	View,
@@ -18,9 +27,7 @@ import { Chess, Move, Square as SquareNotation } from "chess.js";
 import { startEngine, analyzePosition, stopEngine } from "@/utils/ai";
 import { speakMove } from "@/utils/voice";
 import { PieceType } from "chess.js";
-import { supabase } from "@/utils/supabase";
 import { useAuth } from "@/context/AuthContext";
-import { isGameActive } from "@/api/supabaseAPI";
 import { ActivityIndicator, Alert, BackHandler, Pressable } from "react-native";
 import * as Haptics from "expo-haptics";
 import ChessBoard, { ChessBoardRef } from "@/components/chess/ChessBoard";
@@ -169,6 +176,33 @@ export default function GameScreen() {
 	);
 	const [activePlayer, setActivePlayer] = useState<"w" | "b">("w"); // White starts
 	const [gameStarted, setGameStarted] = useState(true);
+
+	// Pulsating animation for active player's clock (∞ symbol)
+	const pulseOpacity = useSharedValue(1);
+
+	useEffect(() => {
+		if (gameStarted && !gameOver.over && !timeSelected) {
+			pulseOpacity.value = withRepeat(
+				withSequence(
+					withTiming(0.3, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+					withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+				),
+				-1, // infinite
+			);
+		} else {
+			cancelAnimation(pulseOpacity);
+			pulseOpacity.value = 1;
+		}
+	}, [gameStarted, gameOver.over, timeSelected]);
+
+	const activePulseStyle = useAnimatedStyle(() => ({
+		opacity: pulseOpacity.value,
+	}));
+
+	const inactivePulseStyle = useAnimatedStyle(() => ({
+		opacity: 0.4,
+	}));
+
 	const [isMyTurn, setIsMyTurn] = useState(false);
 	const [isPlayerWhite, setIsPlayerWhite] = useState<boolean>(
 		playerColor === "b" ? false : true, // default to true (White) if undefined
@@ -628,21 +662,17 @@ export default function GameScreen() {
 	const handleBack = () => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 		if (gameStarted) {
-			Alert.alert(
-				"Game in Progress",
-				"This game will continue in the background. You can return to it from the Home screen at any time.",
-				[
-					{
-						text: "Cancel",
-						style: "cancel",
-					},
-					{
-						text: "Leave Game",
-						style: "destructive",
-						onPress: () => router.back(),
-					},
-				],
-			);
+			Alert.alert("Game in Progress", "Are you sure you want to leave the game?", [
+				{
+					text: "Cancel",
+					style: "cancel",
+				},
+				{
+					text: "Leave Game",
+					style: "destructive",
+					onPress: () => router.back(),
+				},
+			]);
 		} else {
 			router.back();
 		}
@@ -685,9 +715,9 @@ export default function GameScreen() {
 			</View>
 
 			{/* Players & Clocks */}
-			<View className="flex-1 justify-center px-4 w-full max-w-[500px] self-center">
+			<View className="flex-1 justify-center w-full self-center">
 				{/* Opponent (Top) */}
-				<View className="flex-row items-center justify-between mb-8">
+				<View className="flex-row items-center justify-between px-4 mb-8">
 					<View className="flex-row items-center">
 						<View className="rounded-full w-14 h-14 mr-3 border border-gray-600 justify-center items-center overflow-hidden">
 							<Image
@@ -723,23 +753,46 @@ export default function GameScreen() {
 									: "text-gray-400"
 							}`}
 						>
-							{!!timeSelected ? formatTime(blackTime || 0) : "∞"}
+							{!!timeSelected ? (
+								formatTime(blackTime || 0)
+							) : (
+								<Animated.Text
+									style={[
+										{
+											fontSize: 18,
+											fontWeight: "bold",
+											fontFamily: "monospace",
+											color:
+												activePlayer === (isPlayerWhite ? "b" : "w") &&
+												gameStarted &&
+												!gameOver.over
+													? "white"
+													: "#9ca3af",
+										},
+										activePlayer === (isPlayerWhite ? "b" : "w") &&
+										gameStarted &&
+										!gameOver.over
+											? activePulseStyle
+											: inactivePulseStyle,
+									]}
+								>
+									∞
+								</Animated.Text>
+							)}
 						</Text>
 					</View>
 				</View>
 
 				{/* Board Area */}
-				<View className="items-center justify-center my-2 shadow-lg w-full aspect-square">
-					<ChessBoard
-						ref={chessBoardRef}
-						orientation={isPlayerWhite ? "w" : "b"}
-						onMove={onMyMove}
-						interactive={viewingMoveIndex === null}
-					/>
-				</View>
+				<ChessBoard
+					ref={chessBoardRef}
+					orientation={isPlayerWhite ? "w" : "b"}
+					onMove={onMyMove}
+					interactive={viewingMoveIndex === null}
+				/>
 
 				{/* Player (Bottom) */}
-				<View className="flex-row items-center justify-between mt-8">
+				<View className="flex-row items-center justify-between px-4 mt-8">
 					<View className="flex-row items-center">
 						<View className="rounded-full w-14 h-14 mr-3 border border-gray-600 justify-center items-center overflow-hidden">
 							{profile?.avatar_url ? (
@@ -781,7 +834,32 @@ export default function GameScreen() {
 									: "text-gray-400"
 							}`}
 						>
-							{!!timeSelected ? formatTime(whiteTime || 0) : "∞"}
+							{!!timeSelected ? (
+								formatTime(whiteTime || 0)
+							) : (
+								<Animated.Text
+									style={[
+										{
+											fontSize: 18,
+											fontWeight: "bold",
+											fontFamily: "monospace",
+											color:
+												activePlayer === (isPlayerWhite ? "w" : "b") &&
+												gameStarted &&
+												!gameOver.over
+													? "black"
+													: "#9ca3af",
+										},
+										activePlayer === (isPlayerWhite ? "w" : "b") &&
+										gameStarted &&
+										!gameOver.over
+											? activePulseStyle
+											: inactivePulseStyle,
+									]}
+								>
+									∞
+								</Animated.Text>
+							)}
 						</Text>
 					</View>
 				</View>

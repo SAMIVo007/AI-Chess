@@ -1,4 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
+import Animated, {
+	useSharedValue,
+	useAnimatedStyle,
+	withRepeat,
+	withSequence,
+	withTiming,
+	cancelAnimation,
+	Easing,
+} from "react-native-reanimated";
 import type { ComponentProps } from "react";
 import {
 	View,
@@ -97,6 +106,8 @@ const getDescriptiveMove = (
 	return moveText;
 };
 
+const { width } = Dimensions.get("window");
+
 export default function GameScreen() {
 	const router = useRouter();
 	const { session, profile } = useAuth();
@@ -151,6 +162,32 @@ export default function GameScreen() {
 	);
 	const [activePlayer, setActivePlayer] = useState<"w" | "b">("w"); // White starts
 	const [gameStarted, setGameStarted] = useState(false);
+
+	// Pulsating animation for active player's clock (∞ symbol)
+	const pulseOpacity = useSharedValue(1);
+
+	useEffect(() => {
+		if (gameStarted && !gameOver.over && !timeSelected) {
+			pulseOpacity.value = withRepeat(
+				withSequence(
+					withTiming(0.3, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+					withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+				),
+				-1, // infinite
+			);
+		} else {
+			cancelAnimation(pulseOpacity);
+			pulseOpacity.value = 1;
+		}
+	}, [gameStarted, gameOver.over, timeSelected]);
+
+	const activePulseStyle = useAnimatedStyle(() => ({
+		opacity: pulseOpacity.value,
+	}));
+
+	const inactivePulseStyle = useAnimatedStyle(() => ({
+		opacity: 0.4,
+	}));
 
 	// Timer refs for cleanup
 	const timerRef = useRef<number | null>(null); // Keep as number for setInterval ID
@@ -268,6 +305,12 @@ export default function GameScreen() {
 					});
 					setCapturedByWhite(w);
 					setCapturedByBlack(b);
+
+					// Highlight last move on the board
+					if (history.length > 0) {
+						const lastMove = history[history.length - 1];
+						chessBoardRef.current?.highlightLastMove(lastMove.from, lastMove.to);
+					}
 				}
 
 				// Set turn
@@ -830,9 +873,9 @@ export default function GameScreen() {
 			)}
 
 			{/* Players & Clocks */}
-			<View className="flex-1 justify-center px-4 w-full max-w-[500px] self-center">
+			<View className="flex-1 justify-center w-full self-center">
 				{/* Opponent (Top) */}
-				<View className="flex-row items-center justify-between mb-8">
+				<View className="flex-row items-center justify-between px-4 mb-8">
 					<View className="flex-row items-center">
 						<View className="rounded-full w-14 h-14 mr-3 border border-gray-600 justify-center items-center overflow-hidden">
 							{opponentProfile?.avatar_url ? (
@@ -851,7 +894,7 @@ export default function GameScreen() {
 						</View>
 						<View>
 							<Text className="text-base font-semibold text-[#ECEDEE]">
-								{opponentProfile?.username || "Opponent"}
+								{opponentProfile?.username || opponentProfile?.full_name || "Opponent"}
 							</Text>
 							<CapturedPieces
 								captured={isPlayerWhite ? capturedByBlack : capturedByWhite}
@@ -862,34 +905,53 @@ export default function GameScreen() {
 
 					<View
 						className={`px-3 py-1 rounded-md shadow-sm ${
-							activePlayer === "b" && gameStarted && !gameOver.over
-								? "bg-gray-700 border-b-4 border-gray-600"
+							isPlayerWhite && gameStarted && !gameOver.over
+								? "bg-gray-200"
 								: "bg-gray-800"
 						}`}
+						style={{
+							backgroundColor:
+								isPlayerWhite && gameStarted && !gameOver.over ? "#ECEDEE" : "#ECEDEE",
+						}}
 					>
-						<Text
-							className={`text-lg font-mono font-bold ${
-								activePlayer === "b" && gameStarted && !gameOver.over
-									? "text-white"
-									: "text-gray-400"
-							}`}
-						>
-							{!!timeSelected ? formatTime(blackTime || 0) : "∞"}
-						</Text>
+						{!!timeSelected ? (
+							formatTime(blackTime || 0)
+						) : (
+							<Animated.Text
+								style={[
+									{
+										fontSize: 18,
+										fontWeight: "bold",
+										fontFamily: "monospace",
+										color:
+											activePlayer === (isPlayerWhite ? "b" : "w") &&
+											gameStarted &&
+											!gameOver.over
+												? "black"
+												: "#9ca3af",
+									},
+									activePlayer === (isPlayerWhite ? "b" : "w") &&
+									gameStarted &&
+									!gameOver.over
+										? activePulseStyle
+										: inactivePulseStyle,
+								]}
+							>
+								∞
+							</Animated.Text>
+						)}
 					</View>
 				</View>
 
 				{/* Board Area */}
-				<View className="items-center justify-center my-2 shadow-lg w-full aspect-square">
-					<ChessBoard
-						ref={chessBoardRef}
-						orientation={isPlayerWhite ? "w" : "b"}
-						onMove={onMyMove}
-					/>
-				</View>
+				<ChessBoard
+					ref={chessBoardRef}
+					orientation={isPlayerWhite ? "w" : "b"}
+					onMove={onMyMove}
+				/>
 
 				{/* Player (Bottom) */}
-				<View className="flex-row items-center justify-between mt-8">
+				<View className="flex-row items-center justify-between px-4 mt-8">
 					<View className="flex-row items-center">
 						<View className="rounded-full w-14 h-14 mr-3 border border-gray-600 justify-center items-center overflow-hidden">
 							{profile?.avatar_url ? (
@@ -919,8 +981,8 @@ export default function GameScreen() {
 
 					<View
 						className={`px-3 py-1 rounded-md shadow-sm ${
-							activePlayer === "w" && gameStarted && !gameOver.over
-								? "bg-gray-200 border-b-4 border-gray-300"
+							isPlayerWhite && gameStarted && !gameOver.over
+								? "bg-gray-200"
 								: "bg-gray-800"
 						}`}
 					>
@@ -931,7 +993,32 @@ export default function GameScreen() {
 									: "text-gray-400"
 							}`}
 						>
-							{!!timeSelected ? formatTime(whiteTime || 0) : "∞"}
+							{!!timeSelected ? (
+								formatTime(whiteTime || 0)
+							) : (
+								<Animated.Text
+									style={[
+										{
+											fontSize: 18,
+											fontWeight: "bold",
+											fontFamily: "monospace",
+											color:
+												activePlayer === (isPlayerWhite ? "w" : "b") &&
+												gameStarted &&
+												!gameOver.over
+													? "black"
+													: "#9ca3af",
+										},
+										activePlayer === (isPlayerWhite ? "w" : "b") &&
+										gameStarted &&
+										!gameOver.over
+											? activePulseStyle
+											: inactivePulseStyle,
+									]}
+								>
+									∞
+								</Animated.Text>
+							)}
 						</Text>
 					</View>
 				</View>

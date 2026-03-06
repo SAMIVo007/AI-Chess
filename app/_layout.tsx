@@ -9,6 +9,7 @@ import { supabase } from "@/utils/supabase";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
+import * as NavigationBar from "expo-navigation-bar";
 import "react-native-reanimated";
 import "../global.css";
 import {
@@ -52,6 +53,11 @@ export default function RootLayout() {
 			SplashScreen.hideAsync();
 		}
 	}, [loaded]);
+
+	// Hide Android navigation bar app-wide for immersive experience
+	useEffect(() => {
+		NavigationBar.setVisibilityAsync("hidden");
+	}, []);
 
 	if (!loaded) {
 		return null;
@@ -165,19 +171,22 @@ export const AppNavigator = () => {
 
 	return (
 		<Stack>
+			{/* Always-accessible screens (offline-capable) */}
+			<Stack.Screen name="index" options={{ headerShown: false }} />
+			<Stack.Screen name="offline-game" options={{ headerShown: false }} />
+			<Stack.Screen
+				name="play-options"
+				options={{
+					title: "Play Options",
+					headerTitleAlign: "center",
+					headerShown: false,
+				}}
+			/>
+
+			{/* Online-only screens — require auth */}
 			<Stack.Protected guard={!!session}>
-				<Stack.Screen name="index" options={{ headerShown: false }} />
 				<Stack.Screen name="account" options={{ headerShown: false }} />
-				<Stack.Screen name="offline-game" options={{ headerShown: false }} />
 				<Stack.Screen name="online-game" options={{ headerShown: false }} />
-				<Stack.Screen
-					name="play-options"
-					options={{
-						title: "Play Options",
-						headerTitleAlign: "center",
-						headerShown: false,
-					}}
-				/>
 				<Stack.Screen
 					name="challenge-friends"
 					options={{
@@ -186,12 +195,14 @@ export const AppNavigator = () => {
 						headerShown: false,
 					}}
 				/>
-				<Stack.Screen name="+not-found" />
 			</Stack.Protected>
 
+			{/* Auth screen — shown when not logged in */}
 			<Stack.Protected guard={!session}>
 				<Stack.Screen name="auth" options={{ headerShown: false }} />
 			</Stack.Protected>
+
+			<Stack.Screen name="+not-found" />
 		</Stack>
 		// <StatusBar style="auto" />
 	);

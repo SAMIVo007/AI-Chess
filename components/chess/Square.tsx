@@ -1,9 +1,6 @@
-import { View, Dimensions, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
 import React from "react";
 import { SquareProps } from "@/constants/Types";
-
-const { width } = Dimensions.get("window");
-export const SQUARE_SIZE = width / 8;
 
 const columns = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const rows = ["8", "7", "6", "5", "4", "3", "2", "1"];
@@ -13,28 +10,32 @@ export default React.memo(function Square({
 	color,
 	row,
 	col,
+	squareSize,
 	isSelected,
 	isHighlighted,
 	isCapture,
+	isLastMove,
 	onPress,
 }: SquareProps) {
+	const getBackgroundColor = () => {
+		if (isSelected) return "#bbcC44";
+		if (isLastMove) return color === "light" ? "#f5f682" : "#b9ca43";
+		return color === "light" ? "#d4ffd8ff" : "#1c7e26ff";
+	};
+
 	return (
 		<TouchableOpacity
 			activeOpacity={1}
 			onPress={() => onPress?.(row, col)}
 			style={{
 				flexDirection: "row",
-				width: SQUARE_SIZE,
-				height: SQUARE_SIZE,
+				width: squareSize,
+				height: squareSize,
 				justifyContent: "space-between",
 				alignItems: "flex-start",
 				paddingLeft: 2,
 				paddingRight: 2,
-				backgroundColor: isSelected
-					? "#bbcC44" // Highlight color
-					: color === "light"
-					? "#d4ffd8ff"
-					: "#1c7e26ff",
+				backgroundColor: getBackgroundColor(),
 			}}
 		>
 			<View
@@ -88,18 +89,18 @@ export default React.memo(function Square({
 					{isCapture ? (
 						<View
 							style={{
-								width: SQUARE_SIZE,
-								height: SQUARE_SIZE,
+								width: squareSize,
+								height: squareSize,
 								justifyContent: "center",
 								alignItems: "center",
 							}}
 						>
 							<View
 								style={{
-									width: SQUARE_SIZE * 1,
-									height: SQUARE_SIZE * 1,
-									borderRadius: SQUARE_SIZE * 0.5,
-									borderWidth: SQUARE_SIZE * 0.1,
+									width: squareSize * 1,
+									height: squareSize * 1,
+									borderRadius: squareSize * 0.5,
+									borderWidth: squareSize * 0.1,
 									borderColor: "rgba(0, 0, 0, 0.2)", // Semi-transparent circle
 								}}
 							/>
@@ -107,9 +108,9 @@ export default React.memo(function Square({
 					) : (
 						<View
 							style={{
-								width: SQUARE_SIZE * 0.4,
-								height: SQUARE_SIZE * 0.4,
-								borderRadius: SQUARE_SIZE * 0.2,
+								width: squareSize * 0.4,
+								height: squareSize * 0.4,
+								borderRadius: squareSize * 0.2,
 								backgroundColor: "rgba(0, 0, 0, 0.2)", // Semi-transparent dot
 							}}
 						/>

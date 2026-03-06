@@ -35,8 +35,12 @@ export default function RecentGamesList() {
 	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
+		if (!session?.user?.id) {
+			setLoading(false);
+			return;
+		}
 		loadGames();
-	}, []);
+	}, [session?.user?.id]);
 
 	const loadGames = async () => {
 		if (session?.user?.id) {
@@ -138,15 +142,12 @@ export default function RecentGamesList() {
 
 						{/* Info */}
 						<View className="flex-1 mr-2">
-							<Text
-								className="text-white font-bold text-base mb-1"
-								numberOfLines={1}
-							>
+							<Text className="text-white font-bold text-base mb-1" numberOfLines={1}>
 								{item.status === "waiting"
-									? "Waiting for Join..."
+									? "Waiting to join..."
 									: isVsAI
-									? "Stockfish AI"
-									: opponent?.username || "Anonymous Opponent"}
+										? "Stockfish AI"
+										: opponent?.username || opponent?.full_name || "Anonymous Opponent"}
 							</Text>
 							<View className="flex-row items-center">
 								<View
@@ -154,8 +155,8 @@ export default function RecentGamesList() {
 										item.status === "waiting"
 											? "bg-gray-600"
 											: !!isWhite
-											? "bg-white"
-											: "bg-black"
+												? "bg-white"
+												: "bg-black"
 									}`}
 								/>
 								<Text className="text-gray-400 text-xs font-medium">
@@ -212,9 +213,7 @@ export default function RecentGamesList() {
 						loadGames();
 					}}
 				>
-					<Text className="text-indigo-400 font-semibold">
-						Reload
-					</Text>
+					<Text className="text-indigo-400 font-semibold">Reload</Text>
 				</TouchableOpacity>
 			</View>
 			<FlatList

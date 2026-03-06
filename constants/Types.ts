@@ -44,9 +44,11 @@ export interface SquareProps {
 	row: number;
 	col: number;
 	index: number;
+	squareSize: number;
 	isSelected?: boolean;
 	isHighlighted?: boolean;
 	isCapture?: boolean;
+	isLastMove?: boolean;
 	onPress?: (row: number, col: number) => void;
 }
 
@@ -56,12 +58,14 @@ export interface PieceProps {
 	position: Square;
 	row: number;
 	col: number;
+	squareSize: number;
 	onPress?: (row: number, col: number) => void;
 	isSelected?: boolean;
 }
 
 export interface PieceSelectorProps {
 	color: PieceColor;
+	squareSize: number;
 	onPress?: (type: PromotionPieceType) => void;
 }
 

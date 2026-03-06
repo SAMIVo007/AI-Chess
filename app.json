@@ -1,68 +1,73 @@
 {
-	"expo": {
-		"name": "AI-Chess",
-		"slug": "AI-Chess",
-		"version": "1.0.0",
-		"orientation": "portrait",
-		"icon": "./assets/images/app-logo.png",
-		"scheme": "aichess",
-		"userInterfaceStyle": "automatic",
-		"newArchEnabled": true,
-		"ios": {
-			"supportsTablet": true,
-			"bundleIdentifier": "com.samivo.aichess",
-			"associatedDomains": ["applinks:aichess.app"]
-		},
-		"android": {
-			"adaptiveIcon": {
-				"foregroundImage": "./assets/images/app-logo.png",
-				"backgroundColor": "#000000"
-			},
-			"package": "com.samivo.aichess",
-			"edgeToEdgeEnabled": true,
-			"intentFilters": [
-				{
-					"action": "VIEW",
-					"autoVerify": true,
-					"data": [
-						{
-							"scheme": "https",
-							"host": "aichess.app"
-						},
-						{
-							"scheme": "aichess"
-						}
-					],
-					"category": ["BROWSABLE", "DEFAULT"]
-				}
-			]
-		},
-		"web": {
-			"bundler": "metro",
-			"output": "static",
-			"favicon": "./assets/images/app-logo.png"
-		},
-		"plugins": [
-			"expo-router",
-			[
-				"expo-splash-screen",
-				{
-					"image": "./assets/images/app-logo.png",
-					"imageWidth": 200,
-					"resizeMode": "contain",
-					"backgroundColor": "#000000"
-				}
-			],
-			"expo-build-properties"
-		],
-		"experiments": {
-			"typedRoutes": true
-		},
-		"extra": {
-			"router": {},
-			"eas": {
-				"projectId": "aafa8bda-d6da-4b04-a1e0-5e2b4a6478f2"
-			}
-		}
-	}
+  "expo": {
+    "name": "Aura Chess",
+    "slug": "aura-chess",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/app-logo.png",
+    "scheme": "aurachess",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.samivo.aurachess",
+      "associatedDomains": [
+        "applinks:aurachess.app"
+      ]
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/app-logo.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "com.samivo.aurachess",
+      "edgeToEdgeEnabled": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "aurachess.app"
+            },
+            {
+              "scheme": "aurachess"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/app-logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/app-logo.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ],
+      "expo-build-properties"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6a545460-870d-4433-8bea-94a0c3398bff"
+      }
+    }
+  }
 }

@@ -43,14 +43,30 @@ export default function AuthContextProvider({
 	};
 
 	useEffect(() => {
-		// 1️⃣ Restore session on app start
-		supabase.auth.getSession().then(({ data }) => {
-			setSession(data.session);
-			if (data.session) {
-				fetchProfile(data.session.user.id);
-			}
-			setLoading(false);
+		// 1️⃣ Restore session on app start (with timeout so it never hangs while offline)
+		const SESSION_TIMEOUT_MS = 5000;
+
+		const sessionPromise = supabase.auth.getSession().then(({ data }) => {
+			return data.session;
 		});
+
+		const timeoutPromise = new Promise<null>((resolve) => {
+			setTimeout(() => resolve(null), SESSION_TIMEOUT_MS);
+		});
+
+		Promise.race([sessionPromise, timeoutPromise])
+			.then((session) => {
+				setSession(session);
+				if (session) {
+					fetchProfile(session.user.id);
+				}
+				setLoading(false);
+			})
+			.catch((error) => {
+				console.error("Error restoring session:", error);
+				setSession(null);
+				setLoading(false);
+			});
 
 		// 2️⃣ Listen for auth changes
 		const {

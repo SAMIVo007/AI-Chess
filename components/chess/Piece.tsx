@@ -2,7 +2,6 @@ import { TouchableOpacity } from "react-native";
 import { Image } from "expo-image";
 import React, { useEffect } from "react";
 import { PieceProps } from "@/constants/Types";
-import { SQUARE_SIZE } from "./Square";
 import Animated, {
 	useAnimatedStyle,
 	useSharedValue,
@@ -35,23 +34,24 @@ export default React.memo(function Piece({
 	type,
 	row, // Visual Row
 	col, // Visual Col
+	squareSize,
 	onPress,
 	isSelected,
 }: PieceProps) {
-	const translateX = useSharedValue(col * SQUARE_SIZE);
-	const translateY = useSharedValue(row * SQUARE_SIZE);
+	const translateX = useSharedValue(col * squareSize);
+	const translateY = useSharedValue(row * squareSize);
 	const scale = useSharedValue(1);
 
 	useEffect(() => {
-		translateX.value = withTiming(col * SQUARE_SIZE, { duration: 200 });
-		translateY.value = withTiming(row * SQUARE_SIZE, { duration: 200 });
-	}, [col, row, translateX, translateY]);
+		translateX.value = withTiming(col * squareSize, { duration: 200 });
+		translateY.value = withTiming(row * squareSize, { duration: 200 });
+	}, [col, row, translateX, translateY, squareSize]);
 
 	useEffect(() => {
 		if (isSelected) {
 			scale.value = withSequence(
 				withTiming(1.2, { duration: 100 }),
-				withSpring(1, { damping: 50 })
+				withSpring(1, { damping: 50 }),
 			);
 		} else {
 			scale.value = withTiming(1, { duration: 100 });
@@ -73,8 +73,8 @@ export default React.memo(function Piece({
 			style={[
 				{
 					position: "absolute",
-					width: SQUARE_SIZE,
-					height: SQUARE_SIZE,
+					width: squareSize,
+					height: squareSize,
 					justifyContent: "center",
 					alignItems: "center",
 					zIndex: 10,
