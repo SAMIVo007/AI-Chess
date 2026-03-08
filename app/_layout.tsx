@@ -202,6 +202,9 @@ export const AppNavigator = () => {
 
 	return (
 		<Stack>
+			{/* Auth screen — accessible regardless of session */}
+			<Stack.Screen name="auth" options={{ headerShown: false }} />
+
 			{/* Always-accessible screens (offline-capable) */}
 			<Stack.Screen name="index" options={{ headerShown: false }} />
 			<Stack.Screen name="offline-game" options={{ headerShown: false }} />
@@ -213,9 +216,6 @@ export const AppNavigator = () => {
 					headerShown: false,
 				}}
 			/>
-
-			{/* Auth screen — accessible regardless of session */}
-			<Stack.Screen name="auth" options={{ headerShown: false }} />
 
 			{/* Online-only screens — require auth */}
 			<Stack.Protected guard={!!session}>

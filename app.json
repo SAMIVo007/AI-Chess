@@ -2,7 +2,7 @@
 	"expo": {
 		"name": "Aura Chess",
 		"slug": "aura-chess",
-		"version": "1.0.1",
+		"version": "1.0.2",
 		"orientation": "portrait",
 		"icon": "./assets/images/app-logo.png",
 		"scheme": "aurachess",
@@ -12,7 +12,7 @@
 		"ios": {
 			"supportsTablet": true,
 			"bundleIdentifier": "com.samivo.aurachess",
-			"associatedDomains": ["applinks:aurachess.app"]
+			"associatedDomains": ["applinks:aurachess.in"]
 		},
 		"android": {
 			"adaptiveIcon": {
@@ -28,7 +28,7 @@
 					"data": [
 						{
 							"scheme": "https",
-							"host": "aurachess.app"
+							"host": "aurachess.in"
 						},
 						{
 							"scheme": "aurachess"
