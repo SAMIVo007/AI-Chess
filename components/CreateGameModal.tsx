@@ -57,7 +57,7 @@ export const CreateGameModal = ({
 			});
 
 			if (result) {
-				const webLink = `https://aurachess.app/join/${result.inviteCode}`;
+				const webLink = `aurachess://join/${result.inviteCode}`;
 
 				// 1. Close Modal
 				onClose();

@@ -724,7 +724,7 @@ export default function GameScreen() {
 					<View className="flex-row items-center">
 						<View className="rounded-full w-14 h-14 mr-3 border border-gray-600 justify-center items-center overflow-hidden">
 							<Image
-								source={require("@/assets/images/stockfish-logo.png")}
+								source={require("@/assets/images/stockfish-logo.webp")}
 								style={{ width: "100%", height: "100%" }}
 								placeholder={{ blurhash: AiBlurhash }}
 								contentFit="cover"

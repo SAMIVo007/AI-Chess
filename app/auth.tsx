@@ -244,26 +244,26 @@ export default function Auth() {
 											justifyContent: "center",
 										}}
 									>
-										{googleLoading ? (
-											<ActivityIndicator color="#4285F4" />
-										) : (
-											<Image
-												source={require("@/assets/images/google-logo.svg")}
-												style={{ width: 24, height: 24 }}
-												contentFit="contain"
-											/>
-										)}
+										<Image
+											source={require("@/assets/images/google-logo.svg")}
+											style={{ width: 24, height: 24 }}
+											contentFit="contain"
+										/>
 									</View>
 
 									<View
 										style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
 									>
-										<Text
-											className="text-white font-bold text-[17px]"
-											style={{ paddingRight: 24 }}
-										>
-											Continue with Google
-										</Text>
+										{googleLoading ? (
+											<ActivityIndicator color="white" />
+										) : (
+											<Text
+												className="text-white font-bold text-[17px]"
+												style={{ paddingRight: 24 }}
+											>
+												Continue with Google
+											</Text>
+										)}
 									</View>
 								</PressableScale>
 
