@@ -6,6 +6,7 @@ import {
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { supabase } from "@/utils/supabase";
+import { joinGameByInvite } from "@/api/supabaseAPI";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -79,12 +80,12 @@ export default function RootLayout() {
 }
 
 export const AppNavigator = () => {
-	const { session, loading } = useAuth();
+	const { session, loading, hasSeenAuth, setHasSeenAuth } = useAuth();
 	const router = useRouter();
 
 	// Handle deep links
 	useEffect(() => {
-		const handleDeepLink = (url: string) => {
+		const handleDeepLink = async (url: string) => {
 			console.log("[DeepLink] Incoming URL:", url);
 
 			// Parse parameters from both fragment (#) and query string (?)
@@ -130,16 +131,33 @@ export const AppNavigator = () => {
 				Alert.alert("Authentication Error", decodedError);
 			}
 
-			const route = url.replace(/.*?:\/\//g, "");
+			// Handle join game links: aurachess://join/CODE or https://aurachess.app/join/CODE
+			const joinMatch = url.match(/\/join\/([a-zA-Z0-9]+)/);
+			if (joinMatch) {
+				const code = joinMatch[1];
+				console.log("[DeepLink] Join game link detected, code:", code);
 
-			// Handle join game links: aichess://join/ABC123
-			// Route '/join-game' was removed. We redirect to 'challenge-friends' or handle appropriately.
-			// For now, let's just log it or redirect to home if no valid route.
-			if (route.startsWith("join/")) {
-				console.log(
-					"[DeepLink] Join game link detected but join-game route is missing.",
-				);
-				router.push("/challenge-friends");
+				const currentSession = (await supabase.auth.getSession()).data.session;
+				if (currentSession?.user?.id) {
+					try {
+						const gameId = await joinGameByInvite(code, currentSession.user.id);
+						if (gameId) {
+							router.push({ pathname: "/online-game", params: { gameId } });
+						} else {
+							Alert.alert(
+								"Unable to Join",
+								"This invite may have expired or is no longer available.",
+							);
+							router.push("/challenge-friends");
+						}
+					} catch (e) {
+						console.error("[DeepLink] Error joining game:", e);
+						Alert.alert("Error", "Could not join this game. Please try again.");
+					}
+				} else {
+					Alert.alert("Login Required", "Please log in to join this game.");
+					router.push("/auth");
+				}
 			}
 		};
 
@@ -160,6 +178,19 @@ export const AppNavigator = () => {
 			linkingListener?.remove();
 		};
 	}, []);
+
+	// Centralized auth routing
+	useEffect(() => {
+		if (loading) return;
+
+		if (!session && !hasSeenAuth) {
+			router.replace("/auth");
+		} else if (session) {
+			if (!hasSeenAuth) setHasSeenAuth();
+			console.log("[Auth] User is authenticated, redirecting to home...");
+			router.replace("/");
+		}
+	}, [loading, session, hasSeenAuth]);
 
 	if (loading) {
 		return (
@@ -183,6 +214,9 @@ export const AppNavigator = () => {
 				}}
 			/>
 
+			{/* Auth screen — accessible regardless of session */}
+			<Stack.Screen name="auth" options={{ headerShown: false }} />
+
 			{/* Online-only screens — require auth */}
 			<Stack.Protected guard={!!session}>
 				<Stack.Screen name="account" options={{ headerShown: false }} />
@@ -195,11 +229,6 @@ export const AppNavigator = () => {
 						headerShown: false,
 					}}
 				/>
-			</Stack.Protected>
-
-			{/* Auth screen — shown when not logged in */}
-			<Stack.Protected guard={!session}>
-				<Stack.Screen name="auth" options={{ headerShown: false }} />
 			</Stack.Protected>
 
 			<Stack.Screen name="+not-found" />

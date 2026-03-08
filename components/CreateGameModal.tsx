@@ -57,21 +57,17 @@ export const CreateGameModal = ({
 			});
 
 			if (result) {
-				const deepLink = `aichess://join/${result.inviteCode}`;
-				// const webLink = `https://aichess.app/join/${result.inviteCode}`;
+				const webLink = `https://aurachess.app/join/${result.inviteCode}`;
 
 				// 1. Close Modal
 				onClose();
 
-				// // 2. Share
-				// const shareResult = await Share.share({
-				// 	message: `🏁 Join my chess game! I'm playing as ${result.playerColor}.\n\n🔗 Link: ${deepLink}\n\n📱 Code: ${result.inviteCode}`,
-				// 	title: "Chess Game Invite",
-				// 	url: deepLink,
-				// });
+				// 2. Share invite link
+				Share.share({
+					message: `♟️ I challenge you to a chess game on Aura Chess!\n\nTap to join 👇\n${webLink}\n\nOr enter code: ${result.inviteCode}`,
+				});
 
 				// 3. Navigate to Game (regardless of share result, so user can wait)
-				// We wait a bit if share is dismissed to ensure smooth transition
 				setTimeout(() => {
 					router.push({
 						pathname: "/online-game",
@@ -108,7 +104,7 @@ export const CreateGameModal = ({
 		const isSelected = selectedColor === color;
 		const activeBorder = useThemeColor(
 			{ light: "#007AFF", dark: "#0A84FF" },
-			"tint"
+			"tint",
 		);
 
 		return (
@@ -130,10 +126,10 @@ export const CreateGameModal = ({
 						isSelected
 							? activeBorder
 							: color === "white"
-							? "#999"
-							: color === "black"
-							? "#333"
-							: "#666"
+								? "#999"
+								: color === "black"
+									? "#333"
+									: "#666"
 					}
 					solid={color === "black"}
 				/>

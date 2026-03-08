@@ -1,18 +1,31 @@
 import { Profile } from "@/constants/Types";
 import { supabase } from "@/utils/supabase";
 import { Session } from "@supabase/supabase-js";
-import React, { createContext, use, useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, {
+	createContext,
+	use,
+	useCallback,
+	useEffect,
+	useState,
+} from "react";
+
+const HAS_SEEN_AUTH_KEY = "@has_seen_auth";
 
 type AuthContextType = {
 	session: Session | null;
 	profile: Profile | null;
 	loading: boolean;
+	hasSeenAuth: boolean;
+	setHasSeenAuth: () => void;
 };
 
 const AuthContext = createContext<AuthContextType>({
 	session: null,
 	profile: null,
 	loading: true,
+	hasSeenAuth: false,
+	setHasSeenAuth: () => {},
 });
 
 export default function AuthContextProvider({
@@ -23,6 +36,16 @@ export default function AuthContextProvider({
 	const [session, setSession] = useState<Session | null>(null);
 	const [profile, setProfile] = useState<Profile | null>(null);
 	const [loading, setLoading] = useState(true);
+	const [hasSeenAuth, setHasSeenAuthState] = useState(false);
+
+	const setHasSeenAuth = useCallback(async () => {
+		setHasSeenAuthState(true);
+		try {
+			await AsyncStorage.setItem(HAS_SEEN_AUTH_KEY, "true");
+		} catch (e) {
+			console.error("Error saving hasSeenAuth flag:", e);
+		}
+	}, []);
 
 	const fetchProfile = async (userId: string) => {
 		try {
@@ -43,7 +66,7 @@ export default function AuthContextProvider({
 	};
 
 	useEffect(() => {
-		// 1️⃣ Restore session on app start (with timeout so it never hangs while offline)
+		// 1️⃣ Restore session + hasSeenAuth flag on app start
 		const SESSION_TIMEOUT_MS = 5000;
 
 		const sessionPromise = supabase.auth.getSession().then(({ data }) => {
@@ -54,9 +77,14 @@ export default function AuthContextProvider({
 			setTimeout(() => resolve(null), SESSION_TIMEOUT_MS);
 		});
 
-		Promise.race([sessionPromise, timeoutPromise])
-			.then((session) => {
+		const authFlagPromise = AsyncStorage.getItem(HAS_SEEN_AUTH_KEY)
+			.then((val) => val === "true")
+			.catch(() => false);
+
+		Promise.all([Promise.race([sessionPromise, timeoutPromise]), authFlagPromise])
+			.then(([session, seenAuth]) => {
 				setSession(session);
+				setHasSeenAuthState(seenAuth);
 				if (session) {
 					fetchProfile(session.user.id);
 				}
@@ -84,8 +112,8 @@ export default function AuthContextProvider({
 	}, []);
 
 	const value = React.useMemo(
-		() => ({ session, profile, loading }),
-		[session, profile, loading],
+		() => ({ session, profile, loading, hasSeenAuth, setHasSeenAuth }),
+		[session, profile, loading, hasSeenAuth, setHasSeenAuth],
 	);
 
 	return <AuthContext value={value}>{children}</AuthContext>;

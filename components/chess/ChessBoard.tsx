@@ -20,8 +20,6 @@ import {
 import { rowColToSquare } from "@/utils/chessUtils";
 import PieceSelector from "./PieceSelector";
 
-const { width } = Dimensions.get("window");
-
 // Define what methods the parent can call on this board
 export interface ChessBoardRef {
 	move: (
@@ -106,7 +104,8 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 	({ orientation = "w", onMove, interactive = true }, ref) => {
 		// Self-measure: use onLayout to get the actual available width
 		const [boardSize, setBoardSize] = useState(0);
-		const squareSize = boardSize / 8;
+		const squareSize = Math.floor(boardSize / 8);
+		const adjustedBoardSize = squareSize * 8;
 
 		// 1. Initialize the game engine
 		const gameRef = useRef(new Chess());
@@ -369,7 +368,7 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 
 		return (
 			<View
-				style={{ width: "100%", aspectRatio: 1 }}
+				style={{ width: "100%", aspectRatio: 1, alignItems: "center" }}
 				onLayout={(e) => {
 					const w = e.nativeEvent.layout.width;
 					if (w > 0 && w !== boardSize) setBoardSize(w);
@@ -405,8 +404,8 @@ const ChessBoard = forwardRef<ChessBoardRef, BoardProps>(
 								position: "relative",
 								flexDirection: "row",
 								flexWrap: "wrap",
-								width: boardSize,
-								height: boardSize,
+								width: adjustedBoardSize,
+								height: adjustedBoardSize,
 							}}
 						>
 							{/* Squares */}

@@ -40,11 +40,11 @@ const BouncingDots = () => {
 					withSequence(
 						withTiming(-5, { duration: 400 }),
 						withTiming(0, { duration: 400 }),
-						withTiming(0, { duration: 1000 }) // Pause for 1 second before next bounce
+						withTiming(0, { duration: 1000 }), // Pause for 1 second before next bounce
 					),
 					-1,
-					true
-				)
+					true,
+				),
 			);
 		};
 
@@ -86,7 +86,7 @@ export const WaitingOverlay = ({
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 		if (inviteCode) {
 			await Share.share({
-				message: `🏁 Join my chess game! \n\n🔗 Link: aichess://join/${inviteCode}\n📱 Code: ${inviteCode}`,
+				message: `♟️ I challenge you to a chess game on Aura Chess!\n\nTap to join 👇\nhttps://aurachess.app/join/${inviteCode}\n\nOr enter code: ${inviteCode}`,
 			});
 		}
 	};

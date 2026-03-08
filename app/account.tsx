@@ -102,6 +102,7 @@ export default function Account() {
 		try {
 			await supabase.auth.signOut();
 			await GoogleSignin.signOut();
+			router.replace("/auth");
 		} catch (error) {
 			if (error instanceof Error) {
 				Alert.alert(error.message);

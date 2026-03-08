@@ -2,7 +2,7 @@
   "expo": {
     "name": "Aura Chess",
     "slug": "aura-chess",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/app-logo.png",
     "scheme": "aurachess",
@@ -58,7 +58,8 @@
           "backgroundColor": "#000000"
         }
       ],
-      "expo-build-properties"
+      "expo-build-properties",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

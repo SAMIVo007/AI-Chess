@@ -470,7 +470,7 @@ export default function GameScreen() {
 					.subscribe((status) => {
 						console.log(`CHANNEL_STATUS for game-${gameId}:`, status);
 						if (status === "CHANNEL_ERROR") {
-							showToast("Connection Error! Updates may be delayed.");
+							showToast("Connection Error!");
 						}
 					});
 			} catch (error) {
@@ -904,32 +904,28 @@ export default function GameScreen() {
 					</View>
 
 					<View
-						className={`px-3 py-1 rounded-md shadow-sm ${
-							isPlayerWhite && gameStarted && !gameOver.over
-								? "bg-gray-200"
-								: "bg-gray-800"
-						}`}
 						style={{
-							backgroundColor:
-								isPlayerWhite && gameStarted && !gameOver.over ? "#ECEDEE" : "#ECEDEE",
+							paddingHorizontal: 12,
+							paddingVertical: 4,
+							borderRadius: 6,
+							backgroundColor: isPlayerWhite ? "#1f2937" : "#ECEDEE",
 						}}
 					>
 						{!!timeSelected ? (
-							formatTime(blackTime || 0)
+							<Text
+								style={{
+									fontSize: 18,
+									fontWeight: "bold",
+									fontFamily: "monospace",
+									color: isPlayerWhite ? "#e5e7eb" : "#111827",
+								}}
+							>
+								{formatTime(blackTime || 0)}
+							</Text>
 						) : (
-							<Animated.Text
+							<Animated.View
 								style={[
-									{
-										fontSize: 18,
-										fontWeight: "bold",
-										fontFamily: "monospace",
-										color:
-											activePlayer === (isPlayerWhite ? "b" : "w") &&
-											gameStarted &&
-											!gameOver.over
-												? "black"
-												: "#9ca3af",
-									},
+									// Opponent is black when I'm white, white when I'm black
 									activePlayer === (isPlayerWhite ? "b" : "w") &&
 									gameStarted &&
 									!gameOver.over
@@ -937,8 +933,12 @@ export default function GameScreen() {
 										: inactivePulseStyle,
 								]}
 							>
-								∞
-							</Animated.Text>
+								<Ionicons
+									name="infinite"
+									size={18}
+									color={isPlayerWhite ? "#e5e7eb" : "#111827"}
+								/>
+							</Animated.View>
 						)}
 					</View>
 				</View>
@@ -980,46 +980,42 @@ export default function GameScreen() {
 					</View>
 
 					<View
-						className={`px-3 py-1 rounded-md shadow-sm ${
-							isPlayerWhite && gameStarted && !gameOver.over
-								? "bg-gray-200"
-								: "bg-gray-800"
-						}`}
+						style={{
+							paddingHorizontal: 12,
+							paddingVertical: 4,
+							borderRadius: 6,
+							backgroundColor: isPlayerWhite ? "#ECEDEE" : "#1f2937",
+						}}
 					>
-						<Text
-							className={`text-lg font-mono font-bold ${
-								activePlayer === "w" && gameStarted && !gameOver.over
-									? "text-black"
-									: "text-gray-400"
-							}`}
-						>
-							{!!timeSelected ? (
-								formatTime(whiteTime || 0)
-							) : (
-								<Animated.Text
-									style={[
-										{
-											fontSize: 18,
-											fontWeight: "bold",
-											fontFamily: "monospace",
-											color:
-												activePlayer === (isPlayerWhite ? "w" : "b") &&
-												gameStarted &&
-												!gameOver.over
-													? "black"
-													: "#9ca3af",
-										},
-										activePlayer === (isPlayerWhite ? "w" : "b") &&
-										gameStarted &&
-										!gameOver.over
-											? activePulseStyle
-											: inactivePulseStyle,
-									]}
-								>
-									∞
-								</Animated.Text>
-							)}
-						</Text>
+						{!!timeSelected ? (
+							<Text
+								style={{
+									fontSize: 18,
+									fontWeight: "bold",
+									fontFamily: "monospace",
+									color: isPlayerWhite ? "#111827" : "#e5e7eb",
+								}}
+							>
+								{formatTime(whiteTime || 0)}
+							</Text>
+						) : (
+							<Animated.View
+								style={[
+									// I am white when isPlayerWhite, black otherwise
+									activePlayer === (isPlayerWhite ? "w" : "b") &&
+									gameStarted &&
+									!gameOver.over
+										? activePulseStyle
+										: inactivePulseStyle,
+								]}
+							>
+								<Ionicons
+									name="infinite"
+									size={18}
+									color={isPlayerWhite ? "#111827" : "#e5e7eb"}
+								/>
+							</Animated.View>
+						)}
 					</View>
 				</View>
 			</View>

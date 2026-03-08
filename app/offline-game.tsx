@@ -21,6 +21,7 @@ import {
 	MaterialIcons,
 	FontAwesome5,
 	MaterialCommunityIcons,
+	Ionicons,
 } from "@expo/vector-icons";
 import { ThemedView } from "@/components/ThemedView";
 import { Chess, Move, Square as SquareNotation } from "chess.js";
@@ -294,6 +295,7 @@ export default function GameScreen() {
 		// 1. Update Logic Game
 		logicGame.move(move); // Sync local logic
 		setIsMyTurn(false); // Immediate lock
+		setActivePlayer(logicGame.turn() as "w" | "b"); // Now it's AI's turn
 
 		// Update history state
 		setMoveHistory(logicGame.history());
@@ -550,7 +552,8 @@ export default function GameScreen() {
 						setCapturedByBlack(b);
 
 						// Update state and switch active player
-						setActivePlayer("w"); // After AI (black) moves, it's white's turn
+						// logicGame.turn() is now the human's color, regardless of which side they play
+						setActivePlayer(logicGame.turn() as "w" | "b");
 						setIsMyTurn(true);
 
 						setTimeout(() => {
@@ -661,7 +664,7 @@ export default function GameScreen() {
 
 	const handleBack = () => {
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-		if (gameStarted) {
+		if (gameStarted && !gameOver.over) {
 			Alert.alert("Game in Progress", "Are you sure you want to leave the game?", [
 				{
 					text: "Cancel",
@@ -681,7 +684,7 @@ export default function GameScreen() {
 	// Handle hardware back button (Android)
 	useEffect(() => {
 		const backAction = () => {
-			if (gameStarted) {
+			if (gameStarted && !gameOver.over) {
 				handleBack();
 				return true; // Prevent default behavior
 			}
@@ -740,46 +743,42 @@ export default function GameScreen() {
 					</View>
 
 					<View
-						className={`px-3 py-1 rounded-md shadow-sm ${
-							activePlayer === "b" && gameStarted && !gameOver.over
-								? "bg-gray-700 border-b-4 border-gray-600"
-								: "bg-gray-800"
-						}`}
+						style={{
+							paddingHorizontal: 12,
+							paddingVertical: 4,
+							borderRadius: 6,
+							backgroundColor: isPlayerWhite ? "#1f2937" : "#ECEDEE",
+						}}
 					>
-						<Text
-							className={`text-lg font-mono font-bold ${
-								activePlayer === "b" && gameStarted && !gameOver.over
-									? "text-white"
-									: "text-gray-400"
-							}`}
-						>
-							{!!timeSelected ? (
-								formatTime(blackTime || 0)
-							) : (
-								<Animated.Text
-									style={[
-										{
-											fontSize: 18,
-											fontWeight: "bold",
-											fontFamily: "monospace",
-											color:
-												activePlayer === (isPlayerWhite ? "b" : "w") &&
-												gameStarted &&
-												!gameOver.over
-													? "white"
-													: "#9ca3af",
-										},
-										activePlayer === (isPlayerWhite ? "b" : "w") &&
-										gameStarted &&
-										!gameOver.over
-											? activePulseStyle
-											: inactivePulseStyle,
-									]}
-								>
-									∞
-								</Animated.Text>
-							)}
-						</Text>
+						{!!timeSelected ? (
+							<Text
+								style={{
+									fontSize: 18,
+									fontWeight: "bold",
+									fontFamily: "monospace",
+									color: isPlayerWhite ? "#e5e7eb" : "#111827",
+								}}
+							>
+								{formatTime(blackTime || 0)}
+							</Text>
+						) : (
+							<Animated.View
+								style={[
+									// Opponent is black when I'm white, white when I'm black
+									activePlayer === (isPlayerWhite ? "b" : "w") &&
+									gameStarted &&
+									!gameOver.over
+										? activePulseStyle
+										: inactivePulseStyle,
+								]}
+							>
+								<Ionicons
+									name="infinite"
+									size={18}
+									color={isPlayerWhite ? "#e5e7eb" : "#111827"}
+								/>
+							</Animated.View>
+						)}
 					</View>
 				</View>
 
@@ -821,46 +820,42 @@ export default function GameScreen() {
 					</View>
 
 					<View
-						className={`px-3 py-1 rounded-md shadow-sm ${
-							activePlayer === "w" && gameStarted && !gameOver.over
-								? "bg-gray-200 border-b-4 border-gray-300"
-								: "bg-gray-800"
-						}`}
+						style={{
+							paddingHorizontal: 12,
+							paddingVertical: 4,
+							borderRadius: 6,
+							backgroundColor: isPlayerWhite ? "#ECEDEE" : "#1f2937",
+						}}
 					>
-						<Text
-							className={`text-lg font-mono font-bold ${
-								activePlayer === "w" && gameStarted && !gameOver.over
-									? "text-black"
-									: "text-gray-400"
-							}`}
-						>
-							{!!timeSelected ? (
-								formatTime(whiteTime || 0)
-							) : (
-								<Animated.Text
-									style={[
-										{
-											fontSize: 18,
-											fontWeight: "bold",
-											fontFamily: "monospace",
-											color:
-												activePlayer === (isPlayerWhite ? "w" : "b") &&
-												gameStarted &&
-												!gameOver.over
-													? "black"
-													: "#9ca3af",
-										},
-										activePlayer === (isPlayerWhite ? "w" : "b") &&
-										gameStarted &&
-										!gameOver.over
-											? activePulseStyle
-											: inactivePulseStyle,
-									]}
-								>
-									∞
-								</Animated.Text>
-							)}
-						</Text>
+						{!!timeSelected ? (
+							<Text
+								style={{
+									fontSize: 18,
+									fontWeight: "bold",
+									fontFamily: "monospace",
+									color: isPlayerWhite ? "#111827" : "#e5e7eb",
+								}}
+							>
+								{formatTime(whiteTime || 0)}
+							</Text>
+						) : (
+							<Animated.View
+								style={[
+									// I am white when isPlayerWhite, black otherwise
+									activePlayer === (isPlayerWhite ? "w" : "b") &&
+									gameStarted &&
+									!gameOver.over
+										? activePulseStyle
+										: inactivePulseStyle,
+								]}
+							>
+								<Ionicons
+									name="infinite"
+									size={18}
+									color={isPlayerWhite ? "#111827" : "#e5e7eb"}
+								/>
+							</Animated.View>
+						)}
 					</View>
 				</View>
 			</View>
