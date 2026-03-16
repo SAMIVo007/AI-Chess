@@ -20,6 +20,7 @@ import { Image } from "expo-image";
 import { UserBlurhash } from "@/constants/Blurhashes";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import * as Haptics from "expo-haptics";
+import { handleGoBack } from "@/utils/goBackHandler";
 
 export default function Account() {
 	const { session } = useAuth();
@@ -130,7 +131,7 @@ export default function Account() {
 						<TouchableOpacity
 							onPress={() => {
 								Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-								router.back();
+								handleGoBack();
 							}}
 							className="w-10 h-10 rounded-full bg-gray-800 items-center justify-center"
 						>

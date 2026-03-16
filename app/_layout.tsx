@@ -6,7 +6,7 @@ import {
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import { supabase } from "@/utils/supabase";
-import { joinGameByInvite } from "@/api/supabaseAPI";
+
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -131,34 +131,6 @@ export const AppNavigator = () => {
 				Alert.alert("Authentication Error", decodedError);
 			}
 
-			// Handle join game links: aurachess://join/CODE or https://aurachess.app/join/CODE
-			const joinMatch = url.match(/\/join\/([a-zA-Z0-9]+)/);
-			if (joinMatch) {
-				const code = joinMatch[1];
-				console.log("[DeepLink] Join game link detected, code:", code);
-
-				const currentSession = (await supabase.auth.getSession()).data.session;
-				if (currentSession?.user?.id) {
-					try {
-						const gameId = await joinGameByInvite(code, currentSession.user.id);
-						if (gameId) {
-							router.push({ pathname: "/online-game", params: { gameId } });
-						} else {
-							Alert.alert(
-								"Unable to Join",
-								"This invite may have expired or is no longer available.",
-							);
-							router.push("/challenge-friends");
-						}
-					} catch (e) {
-						console.error("[DeepLink] Error joining game:", e);
-						Alert.alert("Error", "Could not join this game. Please try again.");
-					}
-				} else {
-					Alert.alert("Login Required", "Please log in to join this game.");
-					router.push("/auth");
-				}
-			}
 		};
 
 		// Handle incoming links when app is already open
@@ -229,6 +201,7 @@ export const AppNavigator = () => {
 						headerShown: false,
 					}}
 				/>
+				<Stack.Screen name="join/[code]" options={{ headerShown: false }} />
 			</Stack.Protected>
 
 			<Stack.Screen name="+not-found" />

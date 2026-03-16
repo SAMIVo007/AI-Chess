@@ -13,6 +13,7 @@ import { MaterialCommunityIcons, FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { PressableScale } from "pressto";
 import * as Haptics from "expo-haptics";
+import { handleGoBack } from "@/utils/goBackHandler";
 
 const { width } = Dimensions.get("window");
 
@@ -42,15 +43,13 @@ export default function PlayOptions() {
 					<TouchableOpacity
 						onPress={() => {
 							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-							router.back();
+							handleGoBack();
 						}}
 						className="mb-6 self-start bg-gray-800 p-2 rounded-full"
 					>
 						<MaterialCommunityIcons name="arrow-left" size={24} color="#666" />
 					</TouchableOpacity>
-					<Text className="text-4xl font-bold text-white mb-2">
-						Play vs AI
-					</Text>
+					<Text className="text-4xl font-bold text-white mb-2">Play vs AI</Text>
 					<Text className="text-lg text-gray-400">
 						Configure your game and challenge Stockfish.
 					</Text>
@@ -66,9 +65,7 @@ export default function PlayOptions() {
 									<MaterialCommunityIcons name="speedometer" size={24} color="#6366f1" />
 								</View>
 								<View>
-									<Text className="text-lg font-semibold text-white">
-										AI Difficulty
-									</Text>
+									<Text className="text-lg font-semibold text-white">AI Difficulty</Text>
 									<Text className="text-sm text-gray-400">
 										Level {difficulty} • {getDifficultyLabel(difficulty)}
 									</Text>
@@ -99,12 +96,8 @@ export default function PlayOptions() {
 								<MaterialCommunityIcons name="undo" size={24} color="#f97316" />
 							</View>
 							<View>
-								<Text className="text-lg font-semibold text-white">
-									Allow Undo
-								</Text>
-								<Text className="text-sm text-gray-400">
-									Enable taking back moves
-								</Text>
+								<Text className="text-lg font-semibold text-white">Allow Undo</Text>
+								<Text className="text-sm text-gray-400">Enable taking back moves</Text>
 							</View>
 						</View>
 						<Switch
@@ -120,9 +113,7 @@ export default function PlayOptions() {
 
 					{/* Player Color Selection */}
 					<View className="mb-4">
-						<Text className="text-lg font-semibold text-white mb-4">
-							Play As
-						</Text>
+						<Text className="text-lg font-semibold text-white mb-4">Play As</Text>
 						<View className="flex-row gap-4">
 							<TouchableOpacity
 								onPress={() => {
@@ -148,9 +139,7 @@ export default function PlayOptions() {
 								</View>
 								<Text
 									className={`font-semibold ${
-										playerColor === "w"
-											? "text-indigo-400"
-											: "text-gray-400"
+										playerColor === "w" ? "text-indigo-400" : "text-gray-400"
 									}`}
 								>
 									White
@@ -181,9 +170,7 @@ export default function PlayOptions() {
 								</View>
 								<Text
 									className={`font-semibold ${
-										playerColor === "b"
-											? "text-indigo-400"
-											: "text-gray-400"
+										playerColor === "b" ? "text-indigo-400" : "text-gray-400"
 									}`}
 								>
 									Black

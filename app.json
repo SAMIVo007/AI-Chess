@@ -2,7 +2,7 @@
 	"expo": {
 		"name": "Aura Chess",
 		"slug": "aura-chess",
-		"version": "1.0.2",
+		"version": "1.0.3",
 		"orientation": "portrait",
 		"icon": "./assets/images/app-logo.png",
 		"scheme": "aurachess",
@@ -29,9 +29,6 @@
 						{
 							"scheme": "https",
 							"host": "aurachess.in"
-						},
-						{
-							"scheme": "aurachess"
 						}
 					],
 					"category": ["BROWSABLE", "DEFAULT"]

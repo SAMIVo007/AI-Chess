@@ -86,7 +86,7 @@ export const WaitingOverlay = ({
 		Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 		if (inviteCode) {
 			await Share.share({
-				message: `♟️ I challenge you to a chess game on Aura Chess!\n\nTap to join 👇\nhttps://aurachess.app/join/${inviteCode}\n\nOr enter code: ${inviteCode}`,
+				message: `♟️ I challenge you to a chess game on Aura Chess!\n\nTap to join 👇\nhttps://aurachess.in/join/${inviteCode}\n\nOr enter code: ${inviteCode}`,
 			});
 		}
 	};

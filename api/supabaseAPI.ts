@@ -166,6 +166,22 @@ export const createGameWithInvite = async (
 	return null;
 };
 
+/** Look up a game by invite code regardless of status (for deep link handling) */
+export const findGameByInvite = async (inviteCode: string) => {
+	const { data, error } = await supabase
+		.from("games")
+		.select("*")
+		.eq("invite_code", inviteCode)
+		.single();
+
+	if (error || !data) {
+		console.error("Game not found for invite code:", error);
+		return null;
+	}
+
+	return data;
+};
+
 export const joinGameByInvite = async (inviteCode: string, userId: string) => {
 	await cleanupExpiredGames();
 

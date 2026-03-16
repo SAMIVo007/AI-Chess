@@ -8,6 +8,7 @@ import { JoinGameModal } from "@/components/JoinGameModal";
 import { CreateGameModal } from "@/components/CreateGameModal";
 import { ActionCard } from "@/components/ActionCard";
 import * as Haptics from "expo-haptics";
+import { handleGoBack } from "@/utils/goBackHandler";
 
 export default function ChallengeFriends() {
 	const router = useRouter();
@@ -35,7 +36,7 @@ export default function ChallengeFriends() {
 					<TouchableOpacity
 						onPress={() => {
 							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-							router.back();
+							handleGoBack();
 						}}
 						className="mb-6 self-start bg-gray-100 bg-gray-800 p-2 rounded-full"
 					>

@@ -40,6 +40,7 @@ import { CapturedPieces } from "@/components/chess/CapturedPieces";
 import { Image } from "expo-image";
 import { AiBlurhash, UserBlurhash } from "@/constants/Blurhashes";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { handleGoBack } from "@/utils/goBackHandler";
 
 const { width } = Dimensions.get("window");
 
@@ -673,11 +674,11 @@ export default function GameScreen() {
 				{
 					text: "Leave Game",
 					style: "destructive",
-					onPress: () => router.back(),
+					onPress: handleGoBack,
 				},
 			]);
 		} else {
-			router.back();
+			handleGoBack();
 		}
 	};
 
